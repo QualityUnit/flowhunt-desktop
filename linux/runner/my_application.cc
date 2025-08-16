@@ -26,16 +26,26 @@ static void my_application_activate(GApplication* application) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
   
-  // Set the application icon
-  GError* error = nullptr;
-  GdkPixbuf* icon = gdk_pixbuf_new_from_file("data/app_icon.png", &error);
-  if (icon == nullptr) {
-    // Try alternative paths
-    icon = gdk_pixbuf_new_from_file("linux/icons/app_icon.png", &error);
-    if (icon == nullptr) {
-      icon = gdk_pixbuf_new_from_file("../data/app_icon.png", &error);
+  // Set the application icon - try multiple paths
+  const gchar* icon_paths[] = {
+    "/home/yasha/Desktop/projects/flowhunt-dektop/assets/icons/flowhunt.png",
+    "assets/icons/flowhunt.png",
+    "../assets/icons/flowhunt.png",
+    "linux/icons/app_icon.png",
+    "../linux/icons/app_icon.png",
+    "data/app_icon.png",
+    nullptr
+  };
+  
+  GdkPixbuf* icon = nullptr;
+  for (int i = 0; icon_paths[i] != nullptr && icon == nullptr; i++) {
+    GError* error = nullptr;
+    icon = gdk_pixbuf_new_from_file(icon_paths[i], &error);
+    if (error) {
+      g_error_free(error);
     }
   }
+  
   if (icon != nullptr) {
     gtk_window_set_icon(window, icon);
     g_object_unref(icon);
@@ -121,6 +131,20 @@ static void my_application_startup(GApplication* application) {
   //MyApplication* self = MY_APPLICATION(object);
 
   // Perform any actions required at application startup.
+  
+  // Set default application icon
+  const gchar* icon_paths[] = {
+    "/home/yasha/Desktop/projects/flowhunt-dektop/assets/icons/flowhunt.png",
+    "assets/icons/flowhunt.png",
+    nullptr
+  };
+  
+  for (int i = 0; icon_paths[i] != nullptr; i++) {
+    if (g_file_test(icon_paths[i], G_FILE_TEST_EXISTS)) {
+      gtk_window_set_default_icon_from_file(icon_paths[i], nullptr);
+      break;
+    }
+  }
 
   G_APPLICATION_CLASS(my_application_parent_class)->startup(application);
 }

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=FlowHunt Desktop
+Comment=Create AI Agents and connect them to your stack
+Exec=flowhunt_desktop
+Icon=/home/yasha/Desktop/projects/flowhunt-dektop/assets/icons/flowhunt.png
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+StartupNotify=true
+StartupWMClass=flowhunt_desktop
