@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 
@@ -40,19 +41,17 @@ class WelcomeScreen extends StatelessWidget {
                     Container(
                       width: 120,
                       height: 120,
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            theme.colorScheme.primary,
-                            theme.colorScheme.secondary,
-                          ],
-                        ),
+                        color: theme.colorScheme.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: const Icon(
-                        Icons.rocket_launch_rounded,
-                        size: 64,
-                        color: Colors.white,
+                      child: SvgPicture.asset(
+                        'assets/icons/flowhunt-logo.svg',
+                        colorFilter: ColorFilter.mode(
+                          theme.colorScheme.primary,
+                          BlendMode.srcIn,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 32),
