@@ -118,7 +118,7 @@ class WelcomeScreen extends StatelessWidget {
                           context.go('/login');
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
+                          backgroundColor: const Color(0xFF1E429F), // FlowHunt Blue
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppConstants.defaultRadius),

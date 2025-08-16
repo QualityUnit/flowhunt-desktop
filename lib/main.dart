@@ -50,8 +50,8 @@ class FlowHuntApp extends ConsumerWidget {
   }
   
   ThemeData _buildLightTheme() {
-    const primaryColor = Color(0xFF6366F1); // Indigo
-    const secondaryColor = Color(0xFF8B5CF6); // Purple
+    const primaryColor = Color(0xFF1E429F); // FlowHunt Blue
+    const secondaryColor = Color(0xFF2563EB); // Lighter Blue
     
     return ThemeData(
       useMaterial3: true,
@@ -108,8 +108,8 @@ class FlowHuntApp extends ConsumerWidget {
   }
   
   ThemeData _buildDarkTheme() {
-    const primaryColor = Color(0xFF6366F1); // Indigo
-    const secondaryColor = Color(0xFF8B5CF6); // Purple
+    const primaryColor = Color(0xFF1E429F); // FlowHunt Blue
+    const secondaryColor = Color(0xFF2563EB); // Lighter Blue
     
     return ThemeData(
       useMaterial3: true,

@@ -27,7 +27,19 @@ static void my_application_activate(GApplication* application) {
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
   
   // Set the application icon
-  gtk_window_set_icon_from_file(window, "linux/runner/flowhunt.png", nullptr);
+  GError* error = nullptr;
+  GdkPixbuf* icon = gdk_pixbuf_new_from_file("data/app_icon.png", &error);
+  if (icon == nullptr) {
+    // Try alternative paths
+    icon = gdk_pixbuf_new_from_file("linux/icons/app_icon.png", &error);
+    if (icon == nullptr) {
+      icon = gdk_pixbuf_new_from_file("../data/app_icon.png", &error);
+    }
+  }
+  if (icon != nullptr) {
+    gtk_window_set_icon(window, icon);
+    g_object_unref(icon);
+  }
 
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
