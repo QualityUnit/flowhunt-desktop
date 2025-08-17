@@ -20,6 +20,7 @@ class AuthService {
   HttpServer? _redirectServer;
   String? _codeVerifier;
   String? _state;
+  int? _activePort; // Track which port we're using
   
   AuthService({
     required Dio dio,
@@ -58,23 +59,30 @@ class AuthService {
       final codeChallenge = _generateCodeChallenge(_codeVerifier!);
       _state = _generateRandomString(32);
       
-      // Start local redirect server
+      // Start local redirect server (will try multiple ports)
       await _startRedirectServer();
       
-      // Build authorization URL
+      if (_activePort == null) {
+        throw Exception('Could not start redirect server on any available port');
+      }
+      
+      // Build authorization URL with the active port
+      final redirectUri = AppConstants.getRedirectUri(_activePort!);
       final authUrl = Uri.parse(AppConstants.authorizationEndpoint).replace(
         queryParameters: {
           'response_type': 'code',
           'client_id': AppConstants.clientId,
-          'redirect_uri': AppConstants.redirectUri,
+          'client_type': AppConstants.clientType, // Explicitly identify as desktop
+          'redirect_uri': redirectUri,
           'scope': AppConstants.scopes.join(' '),
           'state': _state,
           'code_challenge': codeChallenge,
           'code_challenge_method': 'S256',
+          'app_version': AppConstants.appVersion, // Help server track desktop versions
         },
       );
       
-      _logger.i('Starting OAuth flow with URL: $authUrl');
+      _logger.i('Starting OAuth flow with redirect URI: $redirectUri');
       
       // Open browser for authentication
       if (!await launchUrl(authUrl, mode: LaunchMode.externalApplication)) {
@@ -109,9 +117,28 @@ class AuthService {
       await _stopRedirectServer();
     }
     
-    final uri = Uri.parse(AppConstants.redirectUri);
-    _redirectServer = await HttpServer.bind('localhost', uri.port);
-    _logger.i('Redirect server started on port ${uri.port}');
+    // Try each port in the list
+    for (final port in AppConstants.redirectPorts) {
+      try {
+        _redirectServer = await HttpServer.bind(AppConstants.redirectHost, port);
+        _activePort = port;
+        _logger.i('Redirect server started on port $port');
+        return;
+      } catch (e) {
+        _logger.d('Port $port is not available: $e');
+        continue;
+      }
+    }
+    
+    // If all predefined ports fail, try port 0 (OS assigns available port)
+    try {
+      _redirectServer = await HttpServer.bind(AppConstants.redirectHost, 0);
+      _activePort = _redirectServer!.port;
+      _logger.i('Redirect server started on OS-assigned port $_activePort');
+    } catch (e) {
+      _logger.e('Could not start redirect server on any port: $e');
+      _activePort = null;
+    }
   }
   
   // Stop redirect server
@@ -119,6 +146,7 @@ class AuthService {
     if (_redirectServer != null) {
       await _redirectServer!.close();
       _redirectServer = null;
+      _activePort = null;
       _logger.i('Redirect server stopped');
     }
   }
@@ -210,13 +238,19 @@ class AuthService {
   // Exchange authorization code for tokens
   Future<bool> _exchangeCodeForTokens(String code) async {
     try {
+      if (_activePort == null) {
+        throw Exception('No active port for redirect URI');
+      }
+      
+      final redirectUri = AppConstants.getRedirectUri(_activePort!);
+      
       final response = await _dio.post(
         AppConstants.tokenEndpoint,
         data: {
           'grant_type': 'authorization_code',
           'client_id': AppConstants.clientId,
           'code': code,
-          'redirect_uri': AppConstants.redirectUri,
+          'redirect_uri': redirectUri,
           'code_verifier': _codeVerifier,
         },
         options: Options(
