@@ -27,7 +27,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final success = await authService.signIn();
       
       if (success && mounted) {
-        context.go('/dashboard');
+        context.go('/home');
       } else if (mounted) {
         setState(() {
           _errorMessage = 'Authentication failed. Please try again.';
@@ -189,7 +189,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+
+                    // Retry text during loading
+                    if (_isLoading) ...[
+                      const SizedBox(height: 16),
+                      InkWell(
+                        onTap: _handleSignIn,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Text(
+                            'Waiting for authentication? Click here to retry',
+                            style: TextStyle(
+                              color: theme.colorScheme.primary.withOpacity(0.7),
+                              fontSize: 13,
+                              decoration: TextDecoration.underline,
+                              decorationColor: theme.colorScheme.primary.withOpacity(0.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ] else
+                      const SizedBox(height: 24),
                     
                     // Info Text
                     Container(

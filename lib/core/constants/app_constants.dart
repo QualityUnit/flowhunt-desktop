@@ -4,14 +4,14 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   
   // OAuth Configuration
-  static const String authorizationEndpoint = 'https://api.flowhunt.io/oauth/authorize';
-  static const String tokenEndpoint = 'https://api.flowhunt.io/oauth/token';
+  static const String authorizationEndpoint = 'http://localhost:9010/v2/auth/oauth/authorize';
+  static const String tokenEndpoint = 'http://localhost:9010/v2/auth/oauth/token';
   static const String clientId = 'flowhunt_desktop_client';
   static const String clientType = 'desktop_native'; // Explicitly identify as desktop app
   
   // Dynamic port configuration for OAuth redirect
   static const List<int> redirectPorts = [8080, 8081, 8082, 3000, 3001, 9090, 9091];
-  static const String redirectHost = '127.0.0.1'; // More reliable than localhost
+  static const String redirectHost = 'localhost'; // More reliable than localhost
   static const String redirectPath = '/callback';
   
   // This will be set dynamically when starting auth
@@ -20,7 +20,7 @@ class AppConstants {
   static const List<String> scopes = ['profile', 'agents', 'integrations'];
   
   // API Configuration
-  static const String apiBaseUrl = 'https://api.flowhunt.io';
+  static const String apiBaseUrl = 'http://localhost:9010/v2';
   static const Duration apiTimeout = Duration(seconds: 30);
   
   // Storage Keys

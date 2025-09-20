@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
-import '../screens/dashboard/dashboard_screen.dart';
+import '../screens/home/home_screen.dart';
 import '../screens/onboarding/welcome_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -20,8 +20,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
-        path: '/dashboard',
-        builder: (context, state) => const DashboardScreen(),
+        path: '/home',
+        builder: (context, state) => const HomeScreen(),
         redirect: (context, state) async {
           // Check authentication
           final authService = ref.read(authServiceProvider);
@@ -39,10 +39,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       final authService = ref.read(authServiceProvider);
       final isAuthenticated = await authService.isAuthenticated();
       
-      // If authenticated and trying to access auth pages, redirect to dashboard
-      if (isAuthenticated && 
+      // If authenticated and trying to access auth pages, redirect to home
+      if (isAuthenticated &&
           (state.matchedLocation == '/' || state.matchedLocation == '/login')) {
-        return '/dashboard';
+        return '/home';
       }
       
       return null;
