@@ -46,7 +46,7 @@ dependencies:
   go_router: ^14.0.0
   
   # Storage
-  # flutter_secure_storage: ^9.2.2  # Temporarily disabled for Linux testing
+  flutter_secure_storage: ^9.2.2
   shared_preferences: ^2.2.3
   
   # UI Enhancements
@@ -59,6 +59,19 @@ dependencies:
   logger: ^2.2.0
   equatable: ^2.0.5
   json_annotation: ^4.9.0
+  
+  # Voice-to-Text Dependencies
+  speech_to_text: ^7.0.0
+  permission_handler: ^11.3.1
+  path_provider: ^2.1.4
+  just_audio: ^0.9.40
+  path: ^1.9.0
+  
+  # Advanced Voice Features Dependencies
+  # record: ^5.1.0  # Audio recording with more features (commented due to compatibility issue)
+  fuzzywuzzy: ^1.2.0  # Fuzzy string matching for voice commands
+  uuid: ^4.3.3  # Unique identifiers for speakers and sessions
+  collection: ^1.18.0  # Additional collection utilities
 
 dev_dependencies:
   flutter_test:
@@ -99,7 +112,6 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/images/
     - assets/icons/
 
   # An image asset can refer to one or more resolution-specific "variants", see
