@@ -14,7 +14,7 @@ import 'models/vad_state.dart';
 import 'models/voice_settings.dart';
 import 'services/voice_command_processor.dart';
 import 'services/speaker_identification_service.dart';
-import 'services/language_detector.dart';
+import 'services/whisper_language_detector.dart';
 import 'services/voice_activity_detector.dart';
 import 'services/voice_settings_service.dart';
 

@@ -69,6 +69,7 @@ dependencies:
   
   # Advanced Voice Features Dependencies
   # record: ^5.1.0  # Audio recording with more features (commented due to compatibility issue)
+  flutter_whisper_kit: ^0.3.0  # WhisperKit for language detection and transcription
   fuzzywuzzy: ^1.2.0  # Fuzzy string matching for voice commands
   uuid: ^4.3.3  # Unique identifiers for speakers and sessions
   collection: ^1.18.0  # Additional collection utilities
