@@ -492,7 +492,9 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
             Expanded(
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 600),
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.50,
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(32),
                     child: Column(
@@ -534,19 +536,18 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                         const SizedBox(height: 40),
 
                         // Input field with actions
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 720),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              boxShadow: [
-                                BoxShadow(
-                                  color: theme.colorScheme.primary.withOpacity(0.08),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.colorScheme.primary.withOpacity(0.08),
+                                blurRadius: 20,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
                             children: [
                               TextField(
                                 controller: _messageController,
@@ -599,7 +600,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                                 textInputAction: TextInputAction.send,
                                 style: theme.textTheme.bodyLarge,
                                 autofocus: true,
-                                maxLines: null,
+                                maxLines: 10,
                                 minLines: 2,
                               ),
                               // Always show the action bar
@@ -705,7 +706,6 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                               ],
                             ),
                           ),
-                        ),
 
                         const SizedBox(height: 40),
 

@@ -24,15 +24,31 @@ Map<String, dynamic> _$CreateSessionRequestToJson(
   'inputs': instance.inputs,
 };
 
+CreateSessionResponse _$CreateSessionResponseFromJson(
+  Map<String, dynamic> json,
+) => CreateSessionResponse(
+  sessionId: json['session_id'] as String,
+  createdAt: DateTime.parse(json['created_at'] as String),
+);
+
+Map<String, dynamic> _$CreateSessionResponseToJson(
+  CreateSessionResponse instance,
+) => <String, dynamic>{
+  'session_id': instance.sessionId,
+  'created_at': instance.createdAt.toIso8601String(),
+};
+
 SessionResponse _$SessionResponseFromJson(Map<String, dynamic> json) =>
     SessionResponse(
       sessionId: json['session_id'] as String,
-      flowId: json['flow_id'] as String,
+      flowId: json['flow_id'] as String?,
       chatId: json['chat_id'] as String?,
       sessionName: json['session_name'] as String?,
-      status: json['status'] as String,
+      status: json['status'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      updatedAt: json['updated_at'] == null
+          ? null
+          : DateTime.parse(json['updated_at'] as String),
     );
 
 Map<String, dynamic> _$SessionResponseToJson(SessionResponse instance) =>
@@ -43,7 +59,7 @@ Map<String, dynamic> _$SessionResponseToJson(SessionResponse instance) =>
       'session_name': instance.sessionName,
       'status': instance.status,
       'created_at': instance.createdAt.toIso8601String(),
-      'updated_at': instance.updatedAt.toIso8601String(),
+      'updated_at': instance.updatedAt?.toIso8601String(),
     };
 
 InvokeMessageRequest _$InvokeMessageRequestFromJson(

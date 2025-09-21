@@ -33,14 +33,37 @@ class CreateSessionRequest extends Equatable {
   List<Object?> get props => [flowId, chatId, sessionName, inputs];
 }
 
-// Session response
+// Session creation response - minimal response from API
+@JsonSerializable()
+class CreateSessionResponse extends Equatable {
+  @JsonKey(name: 'session_id')
+  final String sessionId;
+
+  @JsonKey(name: 'created_at')
+  final DateTime createdAt;
+
+  const CreateSessionResponse({
+    required this.sessionId,
+    required this.createdAt,
+  });
+
+  factory CreateSessionResponse.fromJson(Map<String, dynamic> json) =>
+      _$CreateSessionResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$CreateSessionResponseToJson(this);
+
+  @override
+  List<Object?> get props => [sessionId, createdAt];
+}
+
+// Session response - full session details
 @JsonSerializable()
 class SessionResponse extends Equatable {
   @JsonKey(name: 'session_id')
   final String sessionId;
 
   @JsonKey(name: 'flow_id')
-  final String flowId;
+  final String? flowId;
 
   @JsonKey(name: 'chat_id')
   final String? chatId;
@@ -48,22 +71,22 @@ class SessionResponse extends Equatable {
   @JsonKey(name: 'session_name')
   final String? sessionName;
 
-  final String status;
+  final String? status;
 
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
   @JsonKey(name: 'updated_at')
-  final DateTime updatedAt;
+  final DateTime? updatedAt;
 
   const SessionResponse({
     required this.sessionId,
-    required this.flowId,
+    this.flowId,
     this.chatId,
     this.sessionName,
-    required this.status,
+    this.status,
     required this.createdAt,
-    required this.updatedAt,
+    this.updatedAt,
   });
 
   factory SessionResponse.fromJson(Map<String, dynamic> json) =>

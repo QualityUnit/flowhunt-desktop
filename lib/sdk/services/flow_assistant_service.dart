@@ -48,8 +48,20 @@ class FlowAssistantService {
         queryParameters: queryParams,
       );
 
-      final session = SessionResponse.fromJson(response);
-      _currentSessionId = session.sessionId;
+      // Parse the minimal response from API
+      final createResponse = CreateSessionResponse.fromJson(response);
+      _currentSessionId = createResponse.sessionId;
+
+      // Create a full SessionResponse for the app to use
+      final session = SessionResponse(
+        sessionId: createResponse.sessionId,
+        flowId: flowId,
+        chatId: chatId,
+        sessionName: sessionName,
+        status: 'active',
+        createdAt: createResponse.createdAt,
+        updatedAt: createResponse.createdAt,
+      );
 
       _logger.i('Created session: ${session.sessionId}');
       return session;
@@ -76,7 +88,7 @@ class FlowAssistantService {
       );
 
       final response = await _apiClient.post<Map<String, dynamic>>(
-        '/flow_assistants/sessions/$sessionId/invoke',
+        '/flow_assistants/$sessionId/invoke',
         data: request.toJson(),
       );
 
