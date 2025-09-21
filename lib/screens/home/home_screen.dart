@@ -16,8 +16,11 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
+  bool _isSidebarCollapsed = false;
+  late AnimationController _sidebarAnimationController;
+  late Animation<double> _sidebarAnimation;
 
   final List<_NavigationItem> _navigationItems = [
     _NavigationItem(
@@ -46,6 +49,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       label: 'Settings',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _sidebarAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _sidebarAnimation = Tween<double>(
+      begin: 280.0,
+      end: 70.0,
+    ).animate(CurvedAnimation(
+      parent: _sidebarAnimationController,
+      curve: Curves.easeInOutCubic,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _sidebarAnimationController.dispose();
+    super.dispose();
+  }
+
+  void _toggleSidebar() {
+    setState(() {
+      _isSidebarCollapsed = !_isSidebarCollapsed;
+      if (_isSidebarCollapsed) {
+        _sidebarAnimationController.forward();
+      } else {
+        _sidebarAnimationController.reverse();
+      }
+    });
+  }
 
   Future<void> _handleSignOut() async {
     final confirmed = await showDialog<bool>(
@@ -87,8 +123,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: Row(
         children: [
           // Sidebar Navigation
-          Container(
-            width: 280,
+          AnimatedBuilder(
+            animation: _sidebarAnimation,
+            builder: (context, child) => Container(
+            width: _sidebarAnimation.value,
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
               border: Border(
@@ -99,18 +137,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             child: Column(
               children: [
-                // App Header with Workspace Selector
-                Container(
-                  padding: const EdgeInsets.all(24),
+                // App Header with Workspace Selector and Collapse Button
+                Stack(
+                  children: [
+                    Container(
+                  padding: EdgeInsets.all(_isSidebarCollapsed ? 12 : 24),
                   child: Column(
                     children: [
                       // Logo and Title
                       Row(
+                        mainAxisAlignment: _isSidebarCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
                         children: [
                           Container(
-                            width: 48,
-                            height: 48,
-                            padding: const EdgeInsets.all(8),
+                            width: _isSidebarCollapsed ? 36 : 48,
+                            height: _isSidebarCollapsed ? 36 : 48,
+                            padding: EdgeInsets.all(_isSidebarCollapsed ? 6 : 8),
                             decoration: BoxDecoration(
                               color: theme.colorScheme.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
@@ -123,28 +164,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'FlowHunt',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
+                          if (!_isSidebarCollapsed) ...[
+                            const SizedBox(width: 16),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'FlowHunt',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                'Desktop',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                Text(
+                                  'Desktop',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      // Workspace Dropdown
+                      if (!_isSidebarCollapsed) ...[
+                        const SizedBox(height: 16),
+                        // Workspace Dropdown
                       Consumer(
                         builder: (context, ref, _) {
                           final workspaceState = ref.watch(workspaceProvider);
@@ -251,8 +295,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           );
                         },
                       ),
+                      ],
                     ],
                   ),
+                ),
+                    // Collapse/Expand Button
+                    Positioned(
+                      top: 12,
+                      right: 8,
+                      child: IconButton(
+                        onPressed: _toggleSidebar,
+                        icon: Icon(
+                          _isSidebarCollapsed
+                            ? Icons.keyboard_arrow_right
+                            : Icons.keyboard_arrow_left,
+                          size: 20,
+                        ),
+                        style: IconButton.styleFrom(
+                          backgroundColor: theme.colorScheme.surface,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(
+                              color: theme.dividerColor.withValues(alpha: 0.2),
+                            ),
+                          ),
+                        ),
+                        tooltip: _isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
+                      ),
+                    ),
+                  ],
                 ),
 
                 const Divider(height: 1),
@@ -281,8 +352,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             },
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: _isSidebarCollapsed ? 8 : 16,
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
@@ -292,6 +363,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
+                                mainAxisAlignment: _isSidebarCollapsed
+                                  ? MainAxisAlignment.center
+                                  : MainAxisAlignment.start,
                                 children: [
                                   Icon(
                                     isSelected ? item.selectedIcon : item.icon,
@@ -300,19 +374,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                     size: 24,
                                   ),
-                                  const SizedBox(width: 16),
-                                  Text(
-                                    item.label,
-                                    style: TextStyle(
-                                      color: isSelected
-                                          ? theme.colorScheme.primary
-                                          : theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                                      fontWeight: isSelected
-                                          ? FontWeight.w600
-                                          : FontWeight.normal,
-                                      fontSize: 15,
+                                  if (!_isSidebarCollapsed) ...[
+                                    const SizedBox(width: 16),
+                                    Text(
+                                      item.label,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? theme.colorScheme.primary
+                                            : theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                                        fontWeight: isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                        fontSize: 15,
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -356,38 +432,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       )
                                 : null,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Show loading state or user name
-                                userState.isLoading
-                                    ? const SizedBox(
-                                        height: 12,
-                                        width: 100,
-                                        child: LinearProgressIndicator(),
-                                      )
-                                    : Text(
-                                        user?.displayName ?? 'User Account',
-                                        style: theme.textTheme.bodyMedium?.copyWith(
-                                          fontWeight: FontWeight.w600,
+                          if (!_isSidebarCollapsed) ...[
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Show loading state or user name
+                                  userState.isLoading
+                                      ? const SizedBox(
+                                          height: 12,
+                                          width: 100,
+                                          child: LinearProgressIndicator(),
+                                        )
+                                      : Text(
+                                          user?.displayName ?? 'User Account',
+                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                Text(
-                                  user?.email ?? 'Loading...',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                  Text(
+                                    user?.email ?? 'Loading...',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                           IconButton(
                             onPressed: _handleSignOut,
-                            icon: const Icon(Icons.logout),
+                            icon: Icon(
+                              Icons.logout,
+                              size: _isSidebarCollapsed ? 20 : 24,
+                            ),
                             tooltip: 'Sign Out',
                           ),
                         ],
@@ -397,6 +478,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ],
             ),
+          ),
           ),
 
           // Main Content Area
