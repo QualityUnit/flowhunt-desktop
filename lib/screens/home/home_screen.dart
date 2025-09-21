@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/flow_assistant_provider.dart';
+import '../../providers/voice_input_provider.dart';
 import '../../sdk/models/flow_assistant.dart';
+import '../../widgets/voice/voice_recorder_widget.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -638,6 +640,21 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                                         tooltip: 'Add attachment',
                                       ),
                                       const SizedBox(width: 8),
+                                      // Voice recorder button
+                                      VoiceRecorderWidget(
+                                        compact: true,
+                                        size: 32,
+                                        onTranscription: (transcription) {
+                                          _messageController.text = transcription;
+                                        },
+                                        onRecordingComplete: (file) {
+                                          // Auto-send the message after transcription is complete
+                                          if (_messageController.text.trim().isNotEmpty) {
+                                            _sendInitialMessage();
+                                          }
+                                        },
+                                      ),
+                                      const SizedBox(width: 8),
                                       // Model selector
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -881,6 +898,21 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                           minWidth: 36,
                           minHeight: 36,
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Voice recorder button
+                      VoiceRecorderWidget(
+                        compact: true,
+                        size: 32,
+                        onTranscription: (transcription) {
+                          _messageController.text = transcription;
+                        },
+                        onRecordingComplete: (file) {
+                          // Auto-send the message after transcription is complete
+                          if (_messageController.text.trim().isNotEmpty) {
+                            _sendMessage();
+                          }
+                        },
                       ),
                       const SizedBox(width: 12),
                       // Model selector

@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>FlowHunt needs microphone access for voice-to-text input to convert your speech into text for AI conversations.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>FlowHunt uses speech recognition to accurately convert your voice into text for seamless AI interactions.</string>
 </dict>
 </plist>
