@@ -4,8 +4,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/workspace_provider.dart';
 import '../../providers/flow_assistant_provider.dart';
 import '../../sdk/models/flow_assistant.dart';
+import '../../sdk/models/workspace.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -65,8 +67,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
 
     if (confirmed == true && mounted) {
-      // Clear user data
+      // Clear user and workspace data
       ref.read(userProvider.notifier).clear();
+      ref.read(workspaceProvider.notifier).clear();
       // Sign out
       final authService = ref.read(authServiceProvider);
       await authService.signOut();
@@ -96,44 +99,157 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             child: Column(
               children: [
-                // App Header
+                // App Header with Workspace Selector
                 Container(
                   padding: const EdgeInsets.all(24),
-                  child: Row(
+                  child: Column(
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: SvgPicture.asset(
-                          'assets/icons/flowhunt-logo.svg',
-                          colorFilter: ColorFilter.mode(
-                            theme.colorScheme.primary,
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      // Logo and Title
+                      Row(
                         children: [
-                          Text(
-                            'FlowHunt',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
+                          Container(
+                            width: 48,
+                            height: 48,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: SvgPicture.asset(
+                              'assets/icons/flowhunt-logo.svg',
+                              colorFilter: ColorFilter.mode(
+                                theme.colorScheme.primary,
+                                BlendMode.srcIn,
+                              ),
                             ),
                           ),
-                          Text(
-                            'Desktop',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                            ),
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'FlowHunt',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Desktop',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Workspace Dropdown
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final workspaceState = ref.watch(workspaceProvider);
+
+                          if (workspaceState.isLoading && workspaceState.workspaces.isEmpty) {
+                            return const LinearProgressIndicator();
+                          }
+
+                          if (workspaceState.workspaces.isEmpty) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surface,
+                                border: Border.all(
+                                  color: theme.dividerColor.withValues(alpha: 0.2),
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.warning_amber_rounded,
+                                    size: 16,
+                                    color: theme.colorScheme.error,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'No workspaces',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              border: Border.all(
+                                color: theme.dividerColor.withValues(alpha: 0.2),
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<WorkspaceRole>(
+                                value: workspaceState.currentWorkspace,
+                                isExpanded: true,
+                                isDense: false,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                icon: Icon(
+                                  Icons.arrow_drop_down,
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                items: workspaceState.workspaces.map((workspace) {
+                                  return DropdownMenuItem<WorkspaceRole>(
+                                    value: workspace,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.business_outlined,
+                                          size: 16,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                workspace.workspaceName,
+                                                style: theme.textTheme.bodyMedium?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              if (workspace.role != 'M')
+                                                Text(
+                                                  workspace.roleDisplayName,
+                                                  style: theme.textTheme.bodySmall?.copyWith(
+                                                    color: workspace.isOwner || workspace.isAdmin
+                                                        ? theme.colorScheme.primary
+                                                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                                    fontSize: 10,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (workspace) {
+                                  if (workspace != null) {
+                                    ref.read(workspaceProvider.notifier).switchWorkspace(workspace);
+                                  }
+                                },
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
