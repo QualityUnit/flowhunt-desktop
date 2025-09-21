@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/flow_assistant_provider.dart';
-import '../../providers/voice_input_provider.dart';
 import '../../sdk/models/flow_assistant.dart';
 import '../../widgets/voice/voice_recorder_widget.dart';
 
@@ -69,7 +67,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (confirmed == true && mounted) {
       final authService = ref.read(authServiceProvider);
       await authService.signOut();
-      context.go('/login');
+      if (mounted) {
+        context.go('/login');
+      }
     }
   }
 
@@ -87,7 +87,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               color: theme.colorScheme.surface,
               border: Border(
                 right: BorderSide(
-                  color: theme.dividerColor.withOpacity(0.1),
+                  color: theme.dividerColor.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -103,7 +103,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         height: 48,
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.1),
+                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: SvgPicture.asset(
@@ -127,7 +127,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           Text(
                             'Desktop',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withOpacity(0.5),
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                             ),
                           ),
                         ],
@@ -168,7 +168,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? theme.colorScheme.primary.withOpacity(0.1)
+                                    ? theme.colorScheme.primary.withValues(alpha: 0.1)
                                     : null,
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -178,7 +178,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     isSelected ? item.selectedIcon : item.icon,
                                     color: isSelected
                                         ? theme.colorScheme.primary
-                                        : theme.colorScheme.onSurface.withOpacity(0.6),
+                                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                     size: 24,
                                   ),
                                   const SizedBox(width: 16),
@@ -187,7 +187,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     style: TextStyle(
                                       color: isSelected
                                           ? theme.colorScheme.primary
-                                          : theme.colorScheme.onSurface.withOpacity(0.8),
+                                          : theme.colorScheme.onSurface.withValues(alpha: 0.8),
                                       fontWeight: isSelected
                                           ? FontWeight.w600
                                           : FontWeight.normal,
@@ -212,7 +212,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Row(
                     children: [
                       CircleAvatar(
-                        backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                        backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                         child: Icon(
                           Icons.person_outline,
                           color: theme.colorScheme.primary,
@@ -232,7 +232,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             Text(
                               'user@flowhunt.io',
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                               ),
                             ),
                           ],
@@ -260,8 +260,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildContent() {
-    final theme = Theme.of(context);
-
     switch (_selectedIndex) {
       case 0:
         return _AIAssistantChat();
@@ -282,7 +280,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final theme = Theme.of(context);
 
     return Container(
-      color: theme.colorScheme.surface.withOpacity(0.3),
+      color: theme.colorScheme.surface.withValues(alpha: 0.3),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -290,7 +288,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Icon(
@@ -318,7 +316,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Text(
               'This feature will be available in a future update',
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -427,18 +425,6 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
     });
   }
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    final userName = 'there'; // TODO: Get from user profile
-
-    if (hour < 12) {
-      return 'Good morning, $userName';
-    } else if (hour < 17) {
-      return 'Good afternoon, $userName';
-    } else {
-      return 'Good evening, $userName';
-    }
-  }
 
   String _getMainPrompt() {
     final hour = DateTime.now().hour;
@@ -481,7 +467,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
             end: Alignment.bottomCenter,
             colors: [
               theme.colorScheme.surface,
-              theme.colorScheme.surface.withOpacity(0.95),
+              theme.colorScheme.surface.withValues(alpha: 0.95),
             ],
           ),
         ),
@@ -510,8 +496,8 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                theme.colorScheme.primary.withOpacity(0.1),
-                                theme.colorScheme.primary.withOpacity(0.05),
+                                theme.colorScheme.primary.withValues(alpha: 0.1),
+                                theme.colorScheme.primary.withValues(alpha: 0.05),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(20),
@@ -543,7 +529,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                           decoration: BoxDecoration(
                             boxShadow: [
                               BoxShadow(
-                                color: theme.colorScheme.primary.withOpacity(0.08),
+                                color: theme.colorScheme.primary.withValues(alpha: 0.08),
                                 blurRadius: 20,
                                 offset: const Offset(0, 4),
                               ),
@@ -566,7 +552,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                                       bottomRight: Radius.circular(0),
                                     ),
                                     borderSide: BorderSide(
-                                      color: theme.dividerColor.withOpacity(0.1),
+                                      color: theme.dividerColor.withValues(alpha: 0.1),
                                     ),
                                   ),
                                   enabledBorder: OutlineInputBorder(
@@ -577,7 +563,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                                       bottomRight: Radius.circular(0),
                                     ),
                                     borderSide: BorderSide(
-                                      color: theme.dividerColor.withOpacity(0.1),
+                                      color: theme.dividerColor.withValues(alpha: 0.1),
                                     ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
@@ -588,7 +574,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                                       bottomRight: Radius.circular(0),
                                     ),
                                     borderSide: BorderSide(
-                                      color: theme.colorScheme.primary.withOpacity(0.5),
+                                      color: theme.colorScheme.primary.withValues(alpha: 0.5),
                                       width: 2,
                                     ),
                                   ),
@@ -611,13 +597,13 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                                     color: theme.colorScheme.surface,
                                     border: Border(
                                       left: BorderSide(
-                                        color: theme.dividerColor.withOpacity(0.1),
+                                        color: theme.dividerColor.withValues(alpha: 0.1),
                                       ),
                                       right: BorderSide(
-                                        color: theme.dividerColor.withOpacity(0.1),
+                                        color: theme.dividerColor.withValues(alpha: 0.1),
                                       ),
                                       bottom: BorderSide(
-                                        color: theme.dividerColor.withOpacity(0.1),
+                                        color: theme.dividerColor.withValues(alpha: 0.1),
                                       ),
                                     ),
                                     borderRadius: const BorderRadius.only(
@@ -635,7 +621,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                                         },
                                         icon: Icon(
                                           Icons.add_circle_outline,
-                                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                         ),
                                         tooltip: 'Add attachment',
                                       ),
@@ -660,7 +646,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                         decoration: BoxDecoration(
                                           border: Border.all(
-                                            color: theme.dividerColor.withOpacity(0.2),
+                                            color: theme.dividerColor.withValues(alpha: 0.2),
                                           ),
                                           borderRadius: BorderRadius.circular(20),
                                         ),
@@ -685,7 +671,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                                             icon: Icon(
                                               Icons.arrow_drop_down,
                                               size: 20,
-                                              color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                             ),
                                             style: TextStyle(
                                               color: theme.colorScheme.onSurface,
@@ -702,7 +688,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                                         decoration: BoxDecoration(
                                           color: _messageController.text.trim().isNotEmpty
                                               ? theme.colorScheme.primary
-                                              : theme.colorScheme.primary.withOpacity(0.3),
+                                              : theme.colorScheme.primary.withValues(alpha: 0.3),
                                           shape: BoxShape.circle,
                                         ),
                                         child: IconButton(
@@ -762,7 +748,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
 
     // Chat view (after conversation started)
     return Container(
-      color: theme.colorScheme.surface.withOpacity(0.3),
+      color: theme.colorScheme.surface.withValues(alpha: 0.3),
       child: Column(
         children: [
           // Chat Header - simplified without greeting
@@ -811,7 +797,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: theme.colorScheme.error.withOpacity(0.1),
+              color: theme.colorScheme.error.withValues(alpha: 0.1),
               child: Row(
                 children: [
                   Icon(
@@ -861,7 +847,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
               color: theme.colorScheme.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -876,7 +862,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                   decoration: BoxDecoration(
                     border: Border(
                       bottom: BorderSide(
-                        color: theme.dividerColor.withOpacity(0.1),
+                        color: theme.dividerColor.withValues(alpha: 0.1),
                       ),
                     ),
                   ),
@@ -889,7 +875,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                         },
                         icon: Icon(
                           Icons.add_circle_outline,
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                           size: 20,
                         ),
                         tooltip: 'Add attachment',
@@ -919,7 +905,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.05),
+                          color: theme.colorScheme.primary.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
@@ -979,7 +965,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                           decoration: BoxDecoration(
                             color: theme.colorScheme.surface,
                             border: Border.all(
-                              color: theme.dividerColor.withOpacity(0.2),
+                              color: theme.dividerColor.withValues(alpha: 0.2),
                             ),
                             borderRadius: BorderRadius.circular(20),
                           ),
@@ -1012,7 +998,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                         decoration: BoxDecoration(
                           color: _messageController.text.trim().isNotEmpty
                               ? theme.colorScheme.primary
-                              : theme.colorScheme.primary.withOpacity(0.3),
+                              : theme.colorScheme.primary.withValues(alpha: 0.3),
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(
@@ -1051,7 +1037,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: theme.dividerColor.withOpacity(0.2),
+            color: theme.dividerColor.withValues(alpha: 0.2),
           ),
         ),
         child: Row(
@@ -1066,7 +1052,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
             Text(
               label,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.8),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -1090,8 +1076,8 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
           if (!isUser) ...[
             CircleAvatar(
               backgroundColor: isError
-                  ? theme.colorScheme.error.withOpacity(0.1)
-                  : theme.colorScheme.primary.withOpacity(0.1),
+                  ? theme.colorScheme.error.withValues(alpha: 0.1)
+                  : theme.colorScheme.primary.withValues(alpha: 0.1),
               radius: 18,
               child: Icon(
                 isError ? Icons.error_outline : Icons.smart_toy,
@@ -1116,7 +1102,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                 color: isUser
                     ? theme.colorScheme.primary
                     : isError
-                        ? theme.colorScheme.error.withOpacity(0.1)
+                        ? theme.colorScheme.error.withValues(alpha: 0.1)
                         : theme.colorScheme.surface,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
@@ -1126,7 +1112,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                 ),
                 border: !isUser && !isError
                     ? Border.all(
-                        color: theme.dividerColor.withOpacity(0.2),
+                        color: theme.dividerColor.withValues(alpha: 0.2),
                       )
                     : null,
               ),
@@ -1148,7 +1134,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                         Text(
                           'Thinking...',
                           style: TextStyle(
-                            color: theme.colorScheme.onSurface.withOpacity(0.6),
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -1171,7 +1157,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
           if (isUser) ...[
             const SizedBox(width: 12),
             CircleAvatar(
-              backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+              backgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.1),
               radius: 18,
               child: Icon(
                 Icons.person,

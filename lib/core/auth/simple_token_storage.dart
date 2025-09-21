@@ -3,6 +3,7 @@ import '../constants/app_constants.dart';
 import 'token_storage_interface.dart';
 
 class SimpleTokenStorage implements TokenStorageInterface {
+  @override
   Future<void> saveTokens({
     required String accessToken,
     String? refreshToken,
@@ -16,22 +17,26 @@ class SimpleTokenStorage implements TokenStorageInterface {
     }
   }
   
+  @override
   Future<String?> getAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(AppConstants.accessTokenKey);
   }
   
+  @override
   Future<String?> getRefreshToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(AppConstants.refreshTokenKey);
   }
   
+  @override
   Future<void> clearTokens() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.accessTokenKey);
     await prefs.remove(AppConstants.refreshTokenKey);
   }
   
+  @override
   Future<bool> hasTokens() async {
     final accessToken = await getAccessToken();
     return accessToken != null;

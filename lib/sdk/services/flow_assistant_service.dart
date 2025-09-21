@@ -9,6 +9,7 @@ class FlowAssistantService {
   final Logger _logger = Logger();
 
   Timer? _pollTimer;
+  // Session and message tracking
   String? _currentSessionId;
   String? _lastMessageId;
   int _lastTimestamp = 0;

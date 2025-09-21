@@ -133,7 +133,7 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.1),
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -198,7 +198,7 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
                       height: widget.size * 2 * _rippleAnimation.value,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: theme.colorScheme.primary.withOpacity(
+                        color: theme.colorScheme.primary.withValues(alpha: 
                           (1 - _rippleAnimation.value) * 0.3,
                         ),
                       ),
@@ -223,7 +223,7 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: theme.colorScheme.primary.withOpacity(0.3),
+                                color: theme.colorScheme.primary.withValues(alpha: 0.3),
                                 blurRadius: state.isRecording ? 10 : 5,
                                 spreadRadius: state.isRecording ? 2 : 0,
                               ),
@@ -253,7 +253,7 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
               color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: theme.dividerColor.withOpacity(0.2),
+                color: theme.dividerColor.withValues(alpha: 0.2),
               ),
             ),
             child: Text(
@@ -273,7 +273,7 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.error.withOpacity(0.1),
+              color: theme.colorScheme.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -319,7 +319,7 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
             height: barHeight,
             margin: const EdgeInsets.symmetric(horizontal: 1),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(
+              color: theme.colorScheme.primary.withValues(alpha: 
                 barHeight / 40 * 0.8 + 0.2,
               ),
               borderRadius: BorderRadius.circular(1.5),
@@ -391,13 +391,13 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
 
   Color _getButtonColor(ThemeData theme, VoiceInputState state) {
     if (state.isRecording) {
-      return theme.colorScheme.error.withOpacity(0.1);
+      return theme.colorScheme.error.withValues(alpha: 0.1);
     } else if (state.isProcessing) {
-      return theme.colorScheme.primary.withOpacity(0.1);
+      return theme.colorScheme.primary.withValues(alpha: 0.1);
     } else if (!state.canStartRecording) {
-      return theme.colorScheme.onSurface.withOpacity(0.1);
+      return theme.colorScheme.onSurface.withValues(alpha: 0.1);
     } else {
-      return theme.colorScheme.primary.withOpacity(0.1);
+      return theme.colorScheme.primary.withValues(alpha: 0.1);
     }
   }
 
@@ -407,7 +407,7 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
     } else if (state.isProcessing) {
       return theme.colorScheme.primary;
     } else if (!state.canStartRecording) {
-      return theme.colorScheme.onSurface.withOpacity(0.5);
+      return theme.colorScheme.onSurface.withValues(alpha: 0.5);
     } else {
       return theme.colorScheme.primary;
     }

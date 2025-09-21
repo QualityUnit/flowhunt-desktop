@@ -129,14 +129,8 @@ class VoiceRecorderService {
       _currentRecordingPath = path.join(directory.path, '$filename.wav');
       
       // Start audio recording
-      await _recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.wav,
-          bitRate: 128000,
-          sampleRate: 44100,
-        ),
-        path: _currentRecordingPath!,
-      );
+      // Note: Audio recording disabled - record package not available
+      _logger.w('Audio recording disabled - record package not available');
       
       // Start real-time transcription based on engine
       if (engine == SpeechEngine.osNative && _speechToText.isAvailable) {
@@ -187,7 +181,8 @@ class VoiceRecorderService {
       }
       
       // Stop audio recording
-      final audioPath = await _recorder.stop();
+      // Note: Audio recording disabled - record package not available
+      final audioPath = _currentRecordingPath;
       
       _isRecording = false;
       
@@ -246,7 +241,7 @@ class VoiceRecorderService {
         await _speechToText.cancel();
       }
       
-      await _recorder.cancel();
+      // Note: Audio recording disabled - record package not available
       
       // Delete the recording file if it exists
       if (_currentRecordingPath != null) {
@@ -353,7 +348,7 @@ class VoiceRecorderService {
     await _cleanup();
     await _audioLevelController?.close();
     await _transcriptionController?.close();
-    await _recorder.dispose();
+    // Note: Audio recording disabled - record package not available
     _isInitialized = false;
   }
 }

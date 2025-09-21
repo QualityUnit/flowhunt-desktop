@@ -255,9 +255,8 @@ class VoiceInputNotifier extends StateNotifier<VoiceInputState> {
   /// Delete a saved recording file
   Future<void> deleteRecording(String recordingId) async {
     try {
-      final file = state.savedFiles.firstWhere((f) => f.id == recordingId);
-      
       // TODO: Delete actual files from disk
+      // final file = state.savedFiles.firstWhere((f) => f.id == recordingId);
       // final audioFile = File(file.audioPath);
       // final textFile = File(file.textPath);
       // if (await audioFile.exists()) await audioFile.delete();
