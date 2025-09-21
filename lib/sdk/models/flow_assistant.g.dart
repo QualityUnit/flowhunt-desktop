@@ -102,22 +102,31 @@ Map<String, dynamic> _$MessageResponseToJson(MessageResponse instance) =>
       'metadata': instance.metadata,
     };
 
-PollResponse _$PollResponseFromJson(Map<String, dynamic> json) => PollResponse(
-  messages: (json['messages'] as List<dynamic>)
-      .map((e) => MessageResponse.fromJson(e as Map<String, dynamic>))
-      .toList(),
-  hasMore: json['has_more'] as bool,
-  lastMessageId: json['last_message_id'] as String?,
-  lastTimestamp: (json['last_timestamp'] as num?)?.toInt(),
+FlowEvent _$FlowEventFromJson(Map<String, dynamic> json) => FlowEvent(
+  workspaceId: json['workspace_id'] as String,
+  sessionId: json['session_id'] as String,
+  eventId: json['event_id'] as String,
+  eventType: json['event_type'] as String,
+  createdAtTimestamp: FlowEvent._timestampFromJson(
+    json['created_at_timestamp'],
+  ),
+  actionType: json['action_type'] as String,
+  credits: FlowEvent._creditsFromJson(json['credits']),
+  metadata: json['metadata'] as Map<String, dynamic>?,
+  componentName: json['component_name'] as String?,
 );
 
-Map<String, dynamic> _$PollResponseToJson(PollResponse instance) =>
-    <String, dynamic>{
-      'messages': instance.messages,
-      'has_more': instance.hasMore,
-      'last_message_id': instance.lastMessageId,
-      'last_timestamp': instance.lastTimestamp,
-    };
+Map<String, dynamic> _$FlowEventToJson(FlowEvent instance) => <String, dynamic>{
+  'workspace_id': instance.workspaceId,
+  'session_id': instance.sessionId,
+  'event_id': instance.eventId,
+  'event_type': instance.eventType,
+  'created_at_timestamp': instance.createdAtTimestamp,
+  'action_type': instance.actionType,
+  'credits': instance.credits,
+  'metadata': instance.metadata,
+  'component_name': instance.componentName,
+};
 
 SessionListResponse _$SessionListResponseFromJson(Map<String, dynamic> json) =>
     SessionListResponse(

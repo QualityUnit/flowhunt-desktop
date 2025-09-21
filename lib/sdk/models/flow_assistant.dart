@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/equatable.dart';
 
@@ -183,35 +185,134 @@ class MessageResponse extends Equatable {
       ];
 }
 
-// Poll response wrapper
+// Event from polling response
 @JsonSerializable()
-class PollResponse extends Equatable {
-  final List<MessageResponse> messages;
+class FlowEvent extends Equatable {
+  @JsonKey(name: 'workspace_id')
+  final String workspaceId;
 
-  @JsonKey(name: 'has_more')
-  final bool hasMore;
+  @JsonKey(name: 'session_id')
+  final String sessionId;
 
-  @JsonKey(name: 'last_message_id')
-  final String? lastMessageId;
+  @JsonKey(name: 'event_id')
+  final String eventId;
 
-  @JsonKey(name: 'last_timestamp')
-  final int? lastTimestamp;
+  @JsonKey(name: 'event_type')
+  final String eventType;
 
-  const PollResponse({
-    required this.messages,
-    required this.hasMore,
-    this.lastMessageId,
-    this.lastTimestamp,
+  @JsonKey(name: 'created_at_timestamp', fromJson: _timestampFromJson)
+  final int createdAtTimestamp;
+
+  static int _timestampFromJson(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  @JsonKey(name: 'action_type')
+  final String actionType;
+
+  @JsonKey(fromJson: _creditsFromJson)
+  final double? credits;
+
+  static double? _creditsFromJson(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  final Map<String, dynamic>? metadata;
+
+  @JsonKey(name: 'component_name')
+  final String? componentName;
+
+  const FlowEvent({
+    required this.workspaceId,
+    required this.sessionId,
+    required this.eventId,
+    required this.eventType,
+    required this.createdAtTimestamp,
+    required this.actionType,
+    this.credits,
+    this.metadata,
+    this.componentName,
   });
 
-  factory PollResponse.fromJson(Map<String, dynamic> json) =>
-      _$PollResponseFromJson(json);
+  factory FlowEvent.fromJson(Map<String, dynamic> json) =>
+      _$FlowEventFromJson(json);
 
-  Map<String, dynamic> toJson() => _$PollResponseToJson(this);
+  Map<String, dynamic> toJson() => _$FlowEventToJson(this);
 
   @override
-  List<Object?> get props => [messages, hasMore, lastMessageId, lastTimestamp];
+  List<Object?> get props => [
+        workspaceId,
+        sessionId,
+        eventId,
+        eventType,
+        createdAtTimestamp,
+        actionType,
+        credits,
+        metadata,
+        componentName,
+      ];
+
+  // Convert to ChatMessage for UI
+  ChatMessage? toChatMessage() {
+    if (actionType != 'message') return null;
+
+    final messageContent = metadata?['message'] as String?;
+    if (messageContent == null) return null;
+
+    // Parse the message content if it's in FlowHunt format
+    String displayMessage = messageContent;
+    if (messageContent.contains('```flowhunt')) {
+      // Extract the JSON content
+      final startIdx = messageContent.indexOf('```flowhunt') + 11;
+      final endIdx = messageContent.lastIndexOf('```');
+      if (startIdx < endIdx) {
+        try {
+          final jsonStr = messageContent.substring(startIdx, endIdx).trim();
+          final jsonData = json.decode(jsonStr) as Map<String, dynamic>;
+          displayMessage = jsonData['message'] as String? ?? messageContent;
+        } catch (e) {
+          // If parsing fails, use the original message
+          displayMessage = messageContent;
+        }
+      }
+    }
+
+    return ChatMessage(
+      id: eventId,
+      content: displayMessage,
+      type: _parseMessageType(eventType),
+      timestamp: DateTime.fromMillisecondsSinceEpoch(createdAtTimestamp),
+      metadata: metadata,
+    );
+  }
+
+  MessageType _parseMessageType(String type) {
+    switch (type.toLowerCase()) {
+      case 'human':
+        return MessageType.human;
+      case 'ai':
+      case 'assistant':
+        return MessageType.ai;
+      case 'system':
+        return MessageType.system;
+      case 'error':
+        return MessageType.error;
+      default:
+        return MessageType.system;
+    }
+  }
 }
+
+// Poll response wrapper - actual response is just an array
+typedef PollResponse = List<FlowEvent>;
 
 // Session list response
 @JsonSerializable()

@@ -72,7 +72,7 @@ class FlowAssistantService {
   }
 
   // Send message to assistant
-  Future<MessageResponse> sendMessage({
+  Future<void> sendMessage({
     required String sessionId,
     required String message,
     String messageType = 'human',
@@ -87,16 +87,14 @@ class FlowAssistantService {
         streamResponse: streamResponse,
       );
 
-      final response = await _apiClient.post<Map<String, dynamic>>(
+      // The invoke endpoint returns an empty response
+      // Messages come from polling
+      await _apiClient.post<Map<String, dynamic>>(
         '/flow_assistants/$sessionId/invoke',
         data: request.toJson(),
       );
 
-      final messageResponse = MessageResponse.fromJson(response);
-      _lastMessageId = messageResponse.messageId;
-
       _logger.i('Sent message to session $sessionId');
-      return messageResponse;
     } catch (e) {
       _logger.e('Failed to send message: $e');
       rethrow;
@@ -112,24 +110,22 @@ class FlowAssistantService {
       // Use the provided timestamp or the last known timestamp
       final timestamp = fromTimestamp ?? _lastTimestamp;
 
-      final response = await _apiClient.post<Map<String, dynamic>>(
+      // The API returns an array directly, not a wrapper object
+      final response = await _apiClient.post<List<dynamic>>(
         '/flow_assistants/$sessionId/invocation_response/$timestamp',
         data: {}, // Empty body as per API spec
       );
 
-      // Parse the response and update last timestamp
-      final pollResponse = PollResponse.fromJson(response);
+      // Parse the array of events
+      final events = response.map((e) => FlowEvent.fromJson(e as Map<String, dynamic>)).toList();
 
-      if (pollResponse.messages.isNotEmpty) {
-        // Update the last timestamp based on the latest message
-        // Assuming messages have a timestamp field or we need to extract it
-        _lastTimestamp = pollResponse.lastTimestamp ??
-                        DateTime.now().millisecondsSinceEpoch;
-        _lastMessageId = pollResponse.lastMessageId ??
-                         pollResponse.messages.last.messageId;
+      // Update last timestamp if events were received
+      if (events.isNotEmpty) {
+        _lastTimestamp = events.last.createdAtTimestamp;
+        _lastMessageId = events.last.eventId;
       }
 
-      return pollResponse;
+      return events;
     } catch (e) {
       _logger.e('Failed to poll messages: $e');
       rethrow;
@@ -139,7 +135,7 @@ class FlowAssistantService {
   // Start automatic polling
   void startPolling({
     required String sessionId,
-    required Function(List<MessageResponse>) onMessages,
+    required Function(List<FlowEvent>) onMessages,
     Function(dynamic)? onError,
     Duration interval = const Duration(seconds: 2),
   }) {
@@ -150,13 +146,13 @@ class FlowAssistantService {
 
     _pollTimer = Timer.periodic(interval, (_) async {
       try {
-        final response = await pollMessages(
+        final events = await pollMessages(
           sessionId: sessionId,
           fromTimestamp: _lastTimestamp,
         );
 
-        if (response.messages.isNotEmpty) {
-          onMessages(response.messages);
+        if (events.isNotEmpty) {
+          onMessages(events);
         }
       } catch (e) {
         _logger.e('Polling error: $e');

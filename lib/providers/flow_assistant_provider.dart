@@ -144,17 +144,16 @@ class FlowAssistantNotifier extends StateNotifier<FlowAssistantState> {
     );
 
     try {
-      // Send message to API
-      final response = await _service.sendMessage(
+      // Send message to API (returns void, messages come from polling)
+      await _service.sendMessage(
         sessionId: state.currentSession!.sessionId,
         message: message,
       );
 
-      // Remove loading message and add actual response
+      // Messages will come from polling, just remove the loading message
       final updatedMessages = state.messages
           .where((m) => !m.isLoading)
-          .toList()
-        ..add(response.toChatMessage());
+          .toList();
 
       state = state.copyWith(messages: updatedMessages);
     } catch (e) {
@@ -188,17 +187,23 @@ class FlowAssistantNotifier extends StateNotifier<FlowAssistantState> {
 
     _service.startPolling(
       sessionId: sessionId,
-      onMessages: (messages) {
-        // Convert and add new messages to state
-        final chatMessages = messages.map((m) => m.toChatMessage()).toList();
+      onMessages: (events) {
+        // Convert events to chat messages (filter out non-message events)
+        final chatMessages = events
+            .map((e) => e.toChatMessage())
+            .where((m) => m != null)
+            .cast<ChatMessage>()
+            .toList();
 
-        // Filter out any loading messages and append new ones
-        final updatedMessages = state.messages
-            .where((m) => !m.isLoading)
-            .toList()
-          ..addAll(chatMessages);
+        if (chatMessages.isNotEmpty) {
+          // Filter out any loading messages and append new ones
+          final updatedMessages = state.messages
+              .where((m) => !m.isLoading)
+              .toList()
+            ..addAll(chatMessages);
 
-        state = state.copyWith(messages: updatedMessages);
+          state = state.copyWith(messages: updatedMessages);
+        }
       },
       onError: (error) {
         _logger.e('Polling error: $error');

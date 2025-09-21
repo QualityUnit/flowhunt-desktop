@@ -65,14 +65,14 @@ class FlowHuntApiClient {
       ),
     );
 
-    // Add logging interceptor in debug mode
+    // Add logging interceptor in debug mode (reduced verbosity)
     _dio.interceptors.add(
       LogInterceptor(
-        request: true,
-        requestHeader: true,
-        requestBody: true,
-        responseHeader: true,
-        responseBody: true,
+        request: false,
+        requestHeader: false,
+        requestBody: false,
+        responseHeader: false,
+        responseBody: false,
         error: true,
         logPrint: (object) => _logger.d(object.toString()),
       ),
