@@ -582,6 +582,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   bool _hasStartedConversation = false;
+  bool _isChatSidebarVisible = false; // Start with sidebar collapsed
   String _selectedModel = 'GPT-4';
   final List<String> _availableModels = ['GPT-4', 'GPT-3.5', 'Claude', 'Gemini'];
   late String _mainPromptText;
@@ -632,6 +633,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
 
     setState(() {
       _hasStartedConversation = true;
+      _isChatSidebarVisible = false; // Keep sidebar hidden when starting conversation
     });
 
     _messageController.clear();
@@ -756,177 +758,92 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                         ),
                         const SizedBox(height: 40),
 
-                        // Input field with actions
+                        // Clean input field - textarea with icons inside
                         Container(
-                          width: double.infinity,
                           decoration: BoxDecoration(
-                            boxShadow: [
-                              BoxShadow(
-                                color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                                blurRadius: 20,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+                            color: theme.brightness == Brightness.light
+                                ? Colors.grey.shade100
+                                : Colors.grey.shade900,
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: Column(
                             children: [
+                              // Text area
                               TextField(
                                 controller: _messageController,
                                 focusNode: _focusNode,
                                 decoration: InputDecoration(
-                                  hintText: 'Ask me anything...',
-                                  filled: true,
-                                  fillColor: theme.colorScheme.surface,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.only(
-                                      topLeft: Radius.circular(16),
-                                      topRight: Radius.circular(16),
-                                      bottomLeft: Radius.circular(0),
-                                      bottomRight: Radius.circular(0),
-                                    ),
-                                    borderSide: BorderSide(
-                                      color: theme.dividerColor.withValues(alpha: 0.1),
-                                    ),
+                                  hintText: 'Reply to Flowii',
+                                  hintStyle: TextStyle(
+                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                                    fontSize: 15,
                                   ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.only(
-                                      topLeft: Radius.circular(16),
-                                      topRight: Radius.circular(16),
-                                      bottomLeft: Radius.circular(0),
-                                      bottomRight: Radius.circular(0),
-                                    ),
-                                    borderSide: BorderSide(
-                                      color: theme.dividerColor.withValues(alpha: 0.1),
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.only(
-                                      topLeft: Radius.circular(16),
-                                      topRight: Radius.circular(16),
-                                      bottomLeft: Radius.circular(0),
-                                      bottomRight: Radius.circular(0),
-                                    ),
-                                    borderSide: BorderSide(
-                                      color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                                      width: 2,
-                                    ),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 20,
+                                  filled: false,
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  errorBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
+                                  focusedErrorBorder: InputBorder.none,
+                                  contentPadding: const EdgeInsets.only(
+                                    left: 16,
+                                    right: 16,
+                                    top: 16,
+                                    bottom: 12,
                                   ),
                                 ),
                                 onSubmitted: (_) => _sendInitialMessage(),
                                 onChanged: (_) => setState(() {}),
                                 textInputAction: TextInputAction.send,
-                                style: theme.textTheme.bodyLarge,
-                                autofocus: true,
-                                maxLines: 10,
-                                minLines: 2,
-                              ),
-                              // Always show the action bar
-                              Container(
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.surface,
-                                    border: Border(
-                                      left: BorderSide(
-                                        color: theme.dividerColor.withValues(alpha: 0.1),
-                                      ),
-                                      right: BorderSide(
-                                        color: theme.dividerColor.withValues(alpha: 0.1),
-                                      ),
-                                      bottom: BorderSide(
-                                        color: theme.dividerColor.withValues(alpha: 0.1),
-                                      ),
-                                    ),
-                                    borderRadius: const BorderRadius.only(
-                                      bottomLeft: Radius.circular(16),
-                                      bottomRight: Radius.circular(16),
-                                    ),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  child: Row(
-                                    children: [
-                                      // Plus button for attachments
-                                      IconButton(
-                                        onPressed: () {
-                                          // TODO: Implement attachment
-                                        },
-                                        icon: Icon(
-                                          Icons.add_circle_outline,
-                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                        ),
-                                        tooltip: 'Add attachment',
-                                      ),
-                                      const SizedBox(width: 8),
-                                      // Model selector
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(
-                                            color: theme.dividerColor.withValues(alpha: 0.2),
-                                          ),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: DropdownButtonHideUnderline(
-                                          child: DropdownButton<String>(
-                                            value: _selectedModel,
-                                            items: _availableModels.map((model) {
-                                              return DropdownMenuItem(
-                                                value: model,
-                                                child: Text(
-                                                  model,
-                                                  style: theme.textTheme.bodySmall,
-                                                ),
-                                              );
-                                            }).toList(),
-                                            onChanged: (value) {
-                                              setState(() {
-                                                _selectedModel = value!;
-                                              });
-                                            },
-                                            isDense: true,
-                                            icon: Icon(
-                                              Icons.arrow_drop_down,
-                                              size: 20,
-                                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                            ),
-                                            style: TextStyle(
-                                              color: theme.colorScheme.onSurface,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      // Send button with up arrow
-                                      Container(
-                                        height: 32,
-                                        width: 32,
-                                        decoration: BoxDecoration(
-                                          color: _messageController.text.trim().isNotEmpty
-                                              ? theme.colorScheme.primary
-                                              : theme.colorScheme.primary.withValues(alpha: 0.3),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: IconButton(
-                                          onPressed: _messageController.text.trim().isNotEmpty
-                                              ? _sendInitialMessage
-                                              : null,
-                                          icon: const Icon(
-                                            Icons.arrow_upward,
-                                            color: Colors.white,
-                                            size: 16,
-                                          ),
-                                          padding: EdgeInsets.zero,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontSize: 15,
                                 ),
-                              ],
-                            ),
+                                autofocus: true,
+                                maxLines: 3,
+                                minLines: 3,
+                              ),
+                              // Icons row at bottom
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    // Attachment button at left
+                                    IconButton(
+                                      onPressed: () {},
+                                      icon: Icon(
+                                        Icons.add_circle_outline,
+                                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                        size: 22,
+                                      ),
+                                      tooltip: 'Add attachment',
+                                    ),
+                                    // Send button at right
+                                    Container(
+                                      height: 32,
+                                      width: 32,
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primary,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: IconButton(
+                                        onPressed: _messageController.text.trim().isNotEmpty
+                                            ? _sendInitialMessage
+                                            : null,
+                                        icon: Icon(
+                                          Icons.arrow_upward,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
 
                         const SizedBox(height: 40),
 
@@ -965,119 +882,112 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
     }
 
     // Chat view (after conversation started)
-    return Container(
-      color: theme.colorScheme.surface.withValues(alpha: 0.3),
-      child: Column(
-        children: [
-          // Chat Header - simplified without greeting
+    return Row(
+      children: [
+        // Chat history sidebar (collapsed by default)
+        if (_isChatSidebarVisible)
           Container(
-            padding: const EdgeInsets.all(16),
-            color: theme.colorScheme.surface,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.chat_bubble_outline,
-                  color: theme.colorScheme.primary,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'AI Assistant',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                // New Chat Button
-                OutlinedButton.icon(
-                  onPressed: () {
-                    ref.read(flowAssistantProvider.notifier).clearSession();
-                    setState(() {
-                      _hasStartedConversation = false;
-                      _messageController.clear();
-                    });
-                  },
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('New Chat'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ],
+            width: 260,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface.withValues(alpha: 0.5),
+            border: Border(
+              right: BorderSide(
+                color: theme.dividerColor.withValues(alpha: 0.1),
+              ),
             ),
           ),
-
-          // Error Banner
-          if (assistantState.error != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: theme.colorScheme.error.withValues(alpha: 0.1),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    color: theme.colorScheme.error,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      assistantState.error!,
-                      style: TextStyle(
-                        color: theme.colorScheme.error,
-                        fontSize: 13,
+          child: Column(
+            children: [
+              // New Chat Button
+              Container(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      ref.read(flowAssistantProvider.notifier).clearSession();
+                      setState(() {
+                        _hasStartedConversation = false;
+                        _isChatSidebarVisible = false;
+                        _messageController.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('New Chat'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () {
-                      ref.read(flowAssistantProvider.notifier).retryLastMessage();
-                    },
-                    icon: const Icon(Icons.refresh),
-                    iconSize: 20,
-                    color: theme.colorScheme.error,
-                    tooltip: 'Retry',
-                  ),
-                ],
-              ),
-            ),
-
-          // Messages Area
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(24),
-              itemCount: assistantState.messages.length,
-              itemBuilder: (context, index) {
-                final message = assistantState.messages[index];
-                return _buildMessageBubble(message, theme);
-              },
-            ),
-          ),
-
-          // Input Area at bottom with actions
-          Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
                 ),
-              ],
-            ),
+              ),
+              const Divider(height: 1),
+              // Search bar
+              Container(
+                padding: const EdgeInsets.all(12),
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search conversations...',
+                    prefixIcon: Icon(
+                      Icons.search,
+                      size: 20,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                    filled: true,
+                    fillColor: theme.colorScheme.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+              // Chat history list
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  children: [
+                    _buildChatHistoryItem(
+                      'Current Conversation',
+                      'Just now',
+                      true,
+                      theme,
+                    ),
+                    _buildChatHistoryItem(
+                      'Previous chat about AI agents',
+                      '2 hours ago',
+                      false,
+                      theme,
+                    ),
+                    _buildChatHistoryItem(
+                      'Integration setup help',
+                      'Yesterday',
+                      false,
+                      theme,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Main chat area
+        Expanded(
+          child: Container(
+            color: theme.colorScheme.surface.withValues(alpha: 0.3),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                // Action bar
+                // Simplified header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
                     border: Border(
                       bottom: BorderSide(
                         color: theme.dividerColor.withValues(alpha: 0.1),
@@ -1086,144 +996,252 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                   ),
                   child: Row(
                     children: [
-                      // Plus button for attachments
-                      IconButton(
-                        onPressed: () {
-                          // TODO: Implement attachment
-                        },
-                        icon: Icon(
-                          Icons.add_circle_outline,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                          size: 20,
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        tooltip: 'Add attachment',
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 36,
+                        child: Icon(
+                          Icons.auto_awesome,
+                          color: theme.colorScheme.primary,
+                          size: 20,
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Model selector
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'AI Assistant',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            'Always here to help',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      // Model indicator
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.05),
+                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.psychology,
-                              size: 16,
-                              color: theme.colorScheme.primary,
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                              ),
                             ),
                             const SizedBox(width: 6),
-                            DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _selectedModel,
-                                items: _availableModels.map((model) {
-                                  return DropdownMenuItem(
-                                    value: model,
-                                    child: Text(
-                                      model,
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedModel = value!;
-                                  });
-                                },
-                                isDense: true,
-                                icon: Icon(
-                                  Icons.arrow_drop_down,
-                                  size: 18,
-                                  color: theme.colorScheme.primary,
-                                ),
-                                style: TextStyle(
-                                  color: theme.colorScheme.onSurface,
-                                  fontSize: 13,
-                                ),
+                            Text(
+                              _selectedModel,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      // Toggle sidebar button
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _isChatSidebarVisible = !_isChatSidebarVisible;
+                          });
+                        },
+                        icon: Icon(
+                          _isChatSidebarVisible ? Icons.menu_open : Icons.menu,
+                          size: 24,
+                        ),
+                        tooltip: _isChatSidebarVisible ? 'Hide sidebar' : 'Show sidebar',
+                      ),
                     ],
                   ),
                 ),
-                // Text input area
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surface,
-                            border: Border.all(
-                              color: theme.dividerColor.withValues(alpha: 0.2),
+
+                // Error Banner
+                if (assistantState.error != null)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: theme.colorScheme.error.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: theme.colorScheme.error,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            assistantState.error!,
+                            style: TextStyle(
+                              color: theme.colorScheme.error,
+                              fontSize: 13,
                             ),
-                            borderRadius: BorderRadius.circular(20),
                           ),
-                          child: TextField(
+                        ),
+                        TextButton.icon(
+                          onPressed: () {
+                            ref.read(flowAssistantProvider.notifier).retryLastMessage();
+                          },
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Retry'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.error,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Messages Area
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          theme.colorScheme.surface.withValues(alpha: 0.0),
+                          theme.colorScheme.surface.withValues(alpha: 0.3),
+                        ],
+                      ),
+                    ),
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      itemCount: assistantState.messages.length,
+                      itemBuilder: (context, index) {
+                        final message = assistantState.messages[index];
+                        final isLastMessage = index == assistantState.messages.length - 1;
+                        return _buildModernMessageBubble(message, theme, isLastMessage);
+                      },
+                    ),
+                  ),
+                ),
+
+                // Clean input area - centered textarea with icons inside
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.brightness == Brightness.light
+                            ? Colors.grey.shade100
+                            : Colors.grey.shade900,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          // Text area
+                          TextField(
                             controller: _messageController,
                             focusNode: _focusNode,
                             decoration: InputDecoration(
-                              hintText: 'Type your message...',
+                              hintText: 'Reply to Flowii',
+                              hintStyle: TextStyle(
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                                fontSize: 15,
+                              ),
+                              filled: false,
                               border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              errorBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              focusedErrorBorder: InputBorder.none,
+                              contentPadding: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                top: 16,
+                                bottom: 12,
                               ),
                             ),
                             onSubmitted: (_) => _sendMessage(),
                             onChanged: (_) => setState(() {}),
                             textInputAction: TextInputAction.send,
-                            maxLines: 5,
-                            minLines: 1,
+                            maxLines: 3,
+                            minLines: 3,
                             keyboardType: TextInputType.multiline,
-                            style: theme.textTheme.bodyMedium,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 15,
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Send button with up arrow
-                      Container(
-                        height: 36,
-                        width: 36,
-                        decoration: BoxDecoration(
-                          color: _messageController.text.trim().isNotEmpty
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.primary.withValues(alpha: 0.3),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          onPressed: _messageController.text.trim().isNotEmpty
-                              ? _sendMessage
-                              : null,
-                          icon: const Icon(
-                            Icons.arrow_upward,
-                            color: Colors.white,
-                            size: 18,
+                          // Icons row at bottom
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Attachment button at left
+                                IconButton(
+                                  onPressed: () {},
+                                  icon: Icon(
+                                    Icons.add_circle_outline,
+                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                    size: 22,
+                                  ),
+                                  tooltip: 'Add attachment',
+                                ),
+                                // Send button at right
+                                Container(
+                                  height: 32,
+                                  width: 32,
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: IconButton(
+                                    onPressed: _messageController.text.trim().isNotEmpty
+                                        ? _sendMessage
+                                        : null,
+                                    icon: Icon(
+                                      Icons.arrow_upward,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          padding: EdgeInsets.zero,
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1261,6 +1279,269 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildChatHistoryItem(String title, String time, bool isActive, ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: isActive ? theme.colorScheme.primary.withValues(alpha: 0.1) : null,
+              borderRadius: BorderRadius.circular(8),
+              border: isActive
+                  ? Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                    )
+                  : null,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                    color: isActive
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  time,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAction(IconData icon, String label, VoidCallback onTap, ThemeData theme) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: theme.dividerColor.withValues(alpha: 0.2),
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernMessageBubble(ChatMessage message, ThemeData theme, bool isLastMessage) {
+    final isUser = message.type == MessageType.human;
+    final isError = message.type == MessageType.error;
+    final isLoading = message.type == MessageType.loading;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLastMessage ? 8 : 20),
+      child: Column(
+        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          // Message header
+          if (!isUser)
+            Padding(
+              padding: const EdgeInsets.only(left: 48, bottom: 6),
+              child: Row(
+                children: [
+                  Text(
+                    'AI Assistant',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '• now',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          // Message content
+          Row(
+            mainAxisAlignment:
+                isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!isUser) ...[
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  child: CircleAvatar(
+                    backgroundColor: isError
+                        ? theme.colorScheme.error.withValues(alpha: 0.1)
+                        : theme.colorScheme.surface,
+                    radius: 16,
+                    child: isError
+                        ? Icon(
+                            Icons.error_outline,
+                            color: theme.colorScheme.error,
+                            size: 18,
+                          )
+                        : SvgPicture.asset(
+                            'assets/icons/flowhunt-logo.svg',
+                            width: 20,
+                            height: 20,
+                            colorFilter: ColorFilter.mode(
+                              theme.colorScheme.primary,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+              Flexible(
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.5,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isUser
+                        ? theme.colorScheme.primary
+                        : isError
+                            ? theme.colorScheme.error.withValues(alpha: 0.1)
+                            : theme.brightness == Brightness.light
+                                ? Colors.grey.shade100
+                                : theme.colorScheme.surface.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: isUser ? [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ] : null,
+                  ),
+                  child: isLoading
+                      ? _buildTypingIndicator(theme)
+                      : SelectableText(
+                          message.content,
+                          style: TextStyle(
+                            color: isUser
+                                ? Colors.white
+                                : isError
+                                    ? theme.colorScheme.error
+                                    : theme.colorScheme.onSurface,
+                            fontSize: 14,
+                            height: 1.5,
+                          ),
+                        ),
+                ),
+              ),
+              if (isUser && false) ...[
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  child: CircleAvatar(
+                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    radius: 16,
+                    child: Text(
+                      'Y',
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageAction(IconData icon, String tooltip, VoidCallback onTap, ThemeData theme) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        child: Icon(
+          icon,
+          size: 16,
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator(ThemeData theme) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.6),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.4),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.2),
+            shape: BoxShape.circle,
+          ),
+        ),
+      ],
     );
   }
 
