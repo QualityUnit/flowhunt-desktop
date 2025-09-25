@@ -22,11 +22,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   late AnimationController _sidebarAnimationController;
   late Animation<double> _sidebarAnimation;
 
-  final List<_NavigationItem> _navigationItems = [
+  // Track if we're in a conversation (will be updated by child widget)
+  bool _isInConversation = false;
+
+  // Callback to update conversation state
+  void _updateConversationState(bool inConversation) {
+    setState(() {
+      _isInConversation = inConversation;
+    });
+  }
+
+  // Callback to handle new chat
+  void _handleNewChat() {
+    // Clear the session first
+    ref.read(flowAssistantProvider.notifier).clearSession();
+
+    setState(() {
+      _isInConversation = false;
+      // Force rebuild of AI Assistant Chat widget by changing key
+      _selectedIndex = 0;
+    });
+  }
+
+  List<_NavigationItem> get _navigationItems => [
     _NavigationItem(
-      icon: Icons.home_outlined,
-      selectedIcon: Icons.home,
-      label: 'Home',
+      icon: _isInConversation ? Icons.add : Icons.home_outlined,
+      selectedIcon: _isInConversation ? Icons.add : Icons.home,
+      label: _isInConversation ? 'New Chat' : 'Home',
     ),
     _NavigationItem(
       icon: Icons.smart_toy_outlined,
@@ -346,9 +368,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           color: Colors.transparent,
                           child: InkWell(
                             onTap: () {
-                              setState(() {
-                                _selectedIndex = index;
-                              });
+                              if (index == 0 && _isInConversation) {
+                                // Handle new chat
+                                _handleNewChat();
+                              } else {
+                                setState(() {
+                                  _selectedIndex = index;
+                                });
+                              }
                             },
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
@@ -493,7 +520,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Widget _buildContent() {
     switch (_selectedIndex) {
       case 0:
-        return _AIAssistantChat();
+        return _AIAssistantChat(
+          onConversationStateChanged: _updateConversationState,
+          // Use a stable key based on conversation state
+          key: ValueKey('chat_$_isInConversation'),
+        );
       case 1:
         return _buildComingSoonContent('AI Agents', Icons.smart_toy_outlined);
       case 2:
@@ -503,7 +534,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       case 4:
         return _buildComingSoonContent('Settings', Icons.settings_outlined);
       default:
-        return _AIAssistantChat();
+        return _AIAssistantChat(
+          onConversationStateChanged: _updateConversationState,
+          key: ValueKey('chat_$_isInConversation'),
+        );
     }
   }
 
@@ -571,7 +605,12 @@ class _NavigationItem {
 
 // AI Assistant Chat Widget with new centered initial design
 class _AIAssistantChat extends ConsumerStatefulWidget {
-  const _AIAssistantChat();
+  final Function(bool)? onConversationStateChanged;
+
+  const _AIAssistantChat({
+    super.key,
+    this.onConversationStateChanged,
+  });
 
   @override
   ConsumerState<_AIAssistantChat> createState() => _AIAssistantChatState();
@@ -586,15 +625,53 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
   String _selectedModel = 'GPT-4';
   final List<String> _availableModels = ['GPT-4', 'GPT-3.5', 'Claude', 'Gemini'];
   late String _mainPromptText;
+  bool _lastReportedState = false; // Track last reported state to parent
+
+  void _resetChat() {
+    // Generate new prompt only once during reset
+    final newPrompt = _getMainPrompt();
+    setState(() {
+      _hasStartedConversation = false;
+      _isChatSidebarVisible = false;
+      _messageController.clear();
+      _mainPromptText = newPrompt;
+    });
+    // Focus the input field after reset
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _focusNode.requestFocus();
+      }
+    });
+    // Notify parent that we're no longer in a conversation only if state changed
+    if (mounted && _lastReportedState != false) {
+      _lastReportedState = false;
+      widget.onConversationStateChanged?.call(false);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     // Set the random greeting once when the widget is initialized
     _mainPromptText = _getMainPrompt();
+
+    // Check if there are existing messages in the state
+    final assistantState = ref.read(flowAssistantProvider);
+    if (assistantState.messages.isNotEmpty) {
+      _hasStartedConversation = true;
+    }
+
+    _lastReportedState = _hasStartedConversation;
+
     // Focus the input field when the widget is first built
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
+      if (!_hasStartedConversation) {
+        _focusNode.requestFocus();
+      }
+      // Notify parent about initial conversation state
+      if (mounted) {
+        widget.onConversationStateChanged?.call(_hasStartedConversation);
+      }
     });
   }
 
@@ -636,6 +713,12 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
       _isChatSidebarVisible = false; // Keep sidebar hidden when starting conversation
     });
 
+    // Notify parent that we're now in a conversation only if state changed
+    if (_lastReportedState != true) {
+      _lastReportedState = true;
+      widget.onConversationStateChanged?.call(true);
+    }
+
     _messageController.clear();
     await ref.read(flowAssistantProvider.notifier).sendMessage(message);
 
@@ -661,9 +744,13 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
 
   String _getMainPrompt() {
     final hour = DateTime.now().hour;
-    // Get user name from provider
-    final userState = ref.read(userProvider);
-    final userName = userState.user?.username?.split(' ').first ?? 'there';
+    // Get user name from provider - only if widget is mounted
+    String userName = 'there';
+    if (mounted) {
+      final userState = ref.read(userProvider);
+      userName = userState.user?.username?.split(' ').first ?? 'there';
+    }
+
     final prompts = [
       'How can I help you today?',
       'What\'s on your mind, $userName?',
@@ -692,6 +779,16 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
     // Check if conversation has started (either from state or from messages)
     final hasMessages = assistantState.messages.isNotEmpty;
     final showChatView = _hasStartedConversation || hasMessages;
+
+    // Update parent about conversation state only if it actually changed
+    if (_lastReportedState != showChatView) {
+      _lastReportedState = showChatView;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onConversationStateChanged?.call(showChatView);
+        }
+      });
+    }
 
     if (!showChatView) {
       // Initial centered view
@@ -906,11 +1003,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       ref.read(flowAssistantProvider.notifier).clearSession();
-                      setState(() {
-                        _hasStartedConversation = false;
-                        _isChatSidebarVisible = false;
-                        _messageController.clear();
-                      });
+                      _resetChat();
                     },
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('New Chat'),
@@ -1130,15 +1223,22 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                         ],
                       ),
                     ),
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                      itemCount: assistantState.messages.length,
-                      itemBuilder: (context, index) {
-                        final message = assistantState.messages[index];
-                        final isLastMessage = index == assistantState.messages.length - 1;
-                        return _buildModernMessageBubble(message, theme, isLastMessage);
-                      },
+                    child: Center(
+                      child: Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.5,
+                        ),
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          itemCount: assistantState.messages.length,
+                          itemBuilder: (context, index) {
+                            final message = assistantState.messages[index];
+                            final isLastMessage = index == assistantState.messages.length - 1;
+                            return _buildModernMessageBubble(message, theme, isLastMessage);
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1432,9 +1532,6 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
               ],
               Flexible(
                 child: Container(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.5,
-                  ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,

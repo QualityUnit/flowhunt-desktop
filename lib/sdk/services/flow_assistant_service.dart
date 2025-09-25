@@ -11,7 +11,10 @@ class FlowAssistantService {
   Timer? _pollTimer;
   String? _currentSessionId;
   String? _lastMessageId;
-  int _lastTimestamp = 0;
+  String _lastTimestamp = '0';
+  int _pollingInterval = 500; // Start with 500ms
+  int _pollingCounter = 0;
+  int _maxInterval = 5000; // Max 5 seconds
 
   FlowAssistantService({
     required FlowHuntApiClient apiClient,
@@ -104,7 +107,7 @@ class FlowAssistantService {
   // Poll for new messages using timestamp
   Future<PollResponse> pollMessages({
     required String sessionId,
-    int? fromTimestamp,
+    String? fromTimestamp,
   }) async {
     try {
       // Use the provided timestamp or the last known timestamp
@@ -119,10 +122,37 @@ class FlowAssistantService {
       // Parse the array of events
       final events = response.map((e) => FlowEvent.fromJson(e as Map<String, dynamic>)).toList();
 
-      // Update last timestamp if events were received
+      // Update last timestamp to the maximum timestamp received
       if (events.isNotEmpty) {
-        _lastTimestamp = events.last.createdAtTimestamp;
+        // Find the maximum timestamp from all events
+        int maxTimestamp = 0;
+        for (final event in events) {
+          if (event.createdAtTimestamp > maxTimestamp) {
+            maxTimestamp = event.createdAtTimestamp;
+          }
+        }
+
+        // Update timestamp - ensure we always move forward
+        final currentTimestamp = int.tryParse(_lastTimestamp) ?? 0;
+        if (maxTimestamp > currentTimestamp) {
+          _lastTimestamp = maxTimestamp.toString();
+        }
+
         _lastMessageId = events.last.eventId;
+
+        // Reset polling interval when we get events
+        _pollingInterval = 500;
+        _pollingCounter = 0;
+      } else {
+        // No events - increase polling interval
+        _pollingCounter++;
+        if (_pollingCounter >= 10) {
+          _pollingInterval = (_pollingInterval * 1.5).round();
+          if (_pollingInterval > _maxInterval) {
+            _pollingInterval = _maxInterval;
+          }
+          _pollingCounter = 0;
+        }
       }
 
       return events;
@@ -137,30 +167,51 @@ class FlowAssistantService {
     required String sessionId,
     required Function(List<FlowEvent>) onMessages,
     Function(dynamic)? onError,
-    Duration interval = const Duration(seconds: 2),
+    Duration? interval,
   }) {
     _stopPolling();
     _currentSessionId = sessionId;
     // Reset timestamp for new polling session
-    _lastTimestamp = 0;
+    _lastTimestamp = '0';
+    _pollingInterval = 500;
+    _pollingCounter = 0;
 
-    _pollTimer = Timer.periodic(interval, (_) async {
-      try {
-        final events = await pollMessages(
-          sessionId: sessionId,
-          fromTimestamp: _lastTimestamp,
-        );
+    // Initial poll immediately
+    _pollOnce(sessionId, onMessages, onError);
 
-        if (events.isNotEmpty) {
-          onMessages(events);
+    // Then start periodic polling with dynamic interval
+    void scheduleNextPoll() {
+      _pollTimer = Timer(Duration(milliseconds: _pollingInterval), () async {
+        await _pollOnce(sessionId, onMessages, onError);
+        // Schedule next poll if still active
+        if (_currentSessionId == sessionId) {
+          scheduleNextPoll();
         }
-      } catch (e) {
-        _logger.e('Polling error: $e');
-        onError?.call(e);
-      }
-    });
+      });
+    }
 
+    scheduleNextPoll();
     _logger.i('Started polling for session $sessionId');
+  }
+
+  Future<void> _pollOnce(
+    String sessionId,
+    Function(List<FlowEvent>) onMessages,
+    Function(dynamic)? onError,
+  ) async {
+    try {
+      final events = await pollMessages(
+        sessionId: sessionId,
+        fromTimestamp: _lastTimestamp,
+      );
+
+      if (events.isNotEmpty) {
+        onMessages(events);
+      }
+    } catch (e) {
+      _logger.e('Polling error: $e');
+      onError?.call(e);
+    }
   }
 
   // Stop automatic polling
@@ -175,6 +226,8 @@ class FlowAssistantService {
     _stopPolling();
     _currentSessionId = null;
     _lastMessageId = null;
-    _lastTimestamp = 0;
+    _lastTimestamp = '0';
+    _pollingInterval = 500;
+    _pollingCounter = 0;
   }
 }

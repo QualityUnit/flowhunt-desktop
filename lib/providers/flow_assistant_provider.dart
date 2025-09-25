@@ -121,15 +121,8 @@ class FlowAssistantNotifier extends StateNotifier<FlowAssistantState> {
       return;
     }
 
-    // Add user message to chat
-    final userMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      content: message,
-      type: MessageType.human,
-      timestamp: DateTime.now(),
-    );
-
-    // Add loading placeholder for AI response
+    // Don't add user message here - it will come from polling
+    // Just add a loading placeholder for now
     final loadingMessage = ChatMessage(
       id: '${DateTime.now().millisecondsSinceEpoch}_loading',
       content: '',
@@ -139,7 +132,7 @@ class FlowAssistantNotifier extends StateNotifier<FlowAssistantState> {
     );
 
     state = state.copyWith(
-      messages: [...state.messages, userMessage, loadingMessage],
+      messages: [...state.messages, loadingMessage],
       clearError: true,
     );
 
@@ -150,12 +143,7 @@ class FlowAssistantNotifier extends StateNotifier<FlowAssistantState> {
         message: message,
       );
 
-      // Messages will come from polling, just remove the loading message
-      final updatedMessages = state.messages
-          .where((m) => !m.isLoading)
-          .toList();
-
-      state = state.copyWith(messages: updatedMessages);
+      // Don't remove loading here - let polling handle it
     } catch (e) {
       _logger.e('Failed to send message: $e');
 
@@ -185,24 +173,38 @@ class FlowAssistantNotifier extends StateNotifier<FlowAssistantState> {
 
     state = state.copyWith(isPolling: true);
 
+    // Track processed message IDs to avoid duplicates
+    final processedMessageIds = <String>{};
+
     _service.startPolling(
       sessionId: sessionId,
       onMessages: (events) {
         // Convert events to chat messages (filter out non-message events)
-        final chatMessages = events
-            .map((e) => e.toChatMessage())
-            .where((m) => m != null)
-            .cast<ChatMessage>()
-            .toList();
+        final newChatMessages = <ChatMessage>[];
 
-        if (chatMessages.isNotEmpty) {
-          // Filter out any loading messages and append new ones
-          final updatedMessages = state.messages
-              .where((m) => !m.isLoading)
-              .toList()
-            ..addAll(chatMessages);
+        for (final event in events) {
+          final chatMessage = event.toChatMessage();
+          if (chatMessage != null && !processedMessageIds.contains(chatMessage.id)) {
+            newChatMessages.add(chatMessage);
+            processedMessageIds.add(chatMessage.id);
+          }
+        }
 
-          state = state.copyWith(messages: updatedMessages);
+        if (newChatMessages.isNotEmpty) {
+          // Filter out any loading messages and append only truly new messages
+          final existingMessageIds = state.messages.map((m) => m.id).toSet();
+          final uniqueNewMessages = newChatMessages
+              .where((m) => !existingMessageIds.contains(m.id))
+              .toList();
+
+          if (uniqueNewMessages.isNotEmpty) {
+            final updatedMessages = state.messages
+                .where((m) => !m.isLoading)
+                .toList()
+              ..addAll(uniqueNewMessages);
+
+            state = state.copyWith(messages: updatedMessages);
+          }
         }
       },
       onError: (error) {
