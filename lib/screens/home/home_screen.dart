@@ -439,13 +439,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     return Container(
                       padding: EdgeInsets.all(_isSidebarCollapsed ? 8 : 16),
                       child: _isSidebarCollapsed
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Avatar
-                                CircleAvatar(
+                          ? Center(
+                              child: Tooltip(
+                                message: user?.displayName ?? 'User Account',
+                                child: CircleAvatar(
                                   backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                  radius: 16,
+                                  radius: 20,
                                   backgroundImage: user?.avatarUrl != null
                                       ? NetworkImage(user!.avatarUrl!)
                                       : null,
@@ -456,29 +455,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                                               style: TextStyle(
                                                 color: theme.colorScheme.primary,
                                                 fontWeight: FontWeight.bold,
-                                                fontSize: 12,
+                                                fontSize: 14,
                                               ),
                                             )
                                           : Icon(
                                               Icons.person_outline,
                                               color: theme.colorScheme.primary,
-                                              size: 16,
+                                              size: 20,
                                             )
                                       : null,
                                 ),
-                                const SizedBox(height: 8),
-                                // Sign out button
-                                IconButton(
-                                  onPressed: _handleSignOut,
-                                  icon: Icon(
-                                    Icons.logout,
-                                    size: 18,
-                                  ),
-                                  tooltip: 'Sign Out',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                              ],
+                              ),
                             )
                           : Row(
                               children: [
