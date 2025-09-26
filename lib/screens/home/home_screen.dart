@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import '../../providers/workspace_provider.dart';
 import '../../providers/flow_assistant_provider.dart';
 import '../../sdk/models/flow_assistant.dart';
 import '../../sdk/models/workspace.dart';
+import '../../widgets/markdown/fh_markdown.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -435,71 +437,111 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     final user = userState.user;
 
                     return Container(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          // Avatar with initials or icon
-                          CircleAvatar(
-                            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                            backgroundImage: user?.avatarUrl != null
-                                ? NetworkImage(user!.avatarUrl!)
-                                : null,
-                            child: user?.avatarUrl == null
-                                ? user != null
-                                    ? Text(
-                                        user.initials,
-                                        style: TextStyle(
-                                          color: theme.colorScheme.primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                    : Icon(
-                                        Icons.person_outline,
-                                        color: theme.colorScheme.primary,
-                                      )
-                                : null,
-                          ),
-                          if (!_isSidebarCollapsed) ...[
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Show loading state or user name
-                                  userState.isLoading
-                                      ? const SizedBox(
-                                          height: 12,
-                                          width: 100,
-                                          child: LinearProgressIndicator(),
-                                        )
-                                      : Text(
-                                          user?.displayName ?? 'User Account',
-                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                  Text(
-                                    user?.email ?? 'Loading...',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
+                      padding: EdgeInsets.all(_isSidebarCollapsed ? 8 : 16),
+                      child: _isSidebarCollapsed
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Avatar
+                                CircleAvatar(
+                                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                                  radius: 16,
+                                  backgroundImage: user?.avatarUrl != null
+                                      ? NetworkImage(user!.avatarUrl!)
+                                      : null,
+                                  child: user?.avatarUrl == null
+                                      ? user != null
+                                          ? Text(
+                                              user.initials.substring(0, 1),
+                                              style: TextStyle(
+                                                color: theme.colorScheme.primary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                              ),
+                                            )
+                                          : Icon(
+                                              Icons.person_outline,
+                                              color: theme.colorScheme.primary,
+                                              size: 16,
+                                            )
+                                      : null,
+                                ),
+                                const SizedBox(height: 8),
+                                // Sign out button
+                                IconButton(
+                                  onPressed: _handleSignOut,
+                                  icon: Icon(
+                                    Icons.logout,
+                                    size: 18,
                                   ),
-                                ],
-                              ),
+                                  tooltip: 'Sign Out',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                // Avatar with initials or icon
+                                CircleAvatar(
+                                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                                  backgroundImage: user?.avatarUrl != null
+                                      ? NetworkImage(user!.avatarUrl!)
+                                      : null,
+                                  child: user?.avatarUrl == null
+                                      ? user != null
+                                          ? Text(
+                                              user.initials,
+                                              style: TextStyle(
+                                                color: theme.colorScheme.primary,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            )
+                                          : Icon(
+                                              Icons.person_outline,
+                                              color: theme.colorScheme.primary,
+                                            )
+                                      : null,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Show loading state or user name
+                                      userState.isLoading
+                                          ? const SizedBox(
+                                              height: 12,
+                                              width: 100,
+                                              child: LinearProgressIndicator(),
+                                            )
+                                          : Text(
+                                              user?.displayName ?? 'User Account',
+                                              style: theme.textTheme.bodyMedium?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                      Text(
+                                        user?.email ?? 'Loading...',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: _handleSignOut,
+                                  icon: const Icon(
+                                    Icons.logout,
+                                    size: 20,
+                                  ),
+                                  tooltip: 'Sign Out',
+                                ),
+                              ],
                             ),
-                          ],
-                          IconButton(
-                            onPressed: _handleSignOut,
-                            icon: Icon(
-                              Icons.logout,
-                              size: _isSidebarCollapsed ? 20 : 24,
-                            ),
-                            tooltip: 'Sign Out',
-                          ),
-                        ],
-                      ),
                     );
                   },
                 ),
@@ -1555,18 +1597,22 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                   ),
                   child: isLoading
                       ? _buildTypingIndicator(theme)
-                      : SelectableText(
-                          message.content,
-                          style: TextStyle(
-                            color: isUser
-                                ? Colors.white
-                                : isError
-                                    ? theme.colorScheme.error
-                                    : theme.colorScheme.onSurface,
-                            fontSize: 14,
-                            height: 1.5,
-                          ),
-                        ),
+                      : isUser
+                          ? SelectableText(
+                              message.content,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                height: 1.5,
+                              ),
+                            )
+                          : FHMarkdown(
+                              content: message.content,
+                              onSendMessage: (msg) {
+                                _messageController.text = msg;
+                                _sendMessage();
+                              },
+                            ),
                 ),
               ),
               if (isUser && false) ...[
@@ -1588,7 +1634,104 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
               ],
             ],
           ),
+          // Action buttons for AI messages
+          if (!isUser && !isLoading && !isError)
+            Padding(
+              padding: const EdgeInsets.only(left: 48, top: 8),
+              child: Row(
+                children: [
+                  _buildMessageActionButton(
+                    icon: Icons.copy_rounded,
+                    tooltip: 'Copy',
+                    onTap: () {
+                      // Copy message to clipboard
+                      Clipboard.setData(ClipboardData(text: message.content));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Message copied to clipboard'),
+                          duration: const Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                          margin: const EdgeInsets.all(8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    },
+                    theme: theme,
+                  ),
+                  const SizedBox(width: 4),
+                  _buildMessageActionButton(
+                    icon: Icons.thumb_up_outlined,
+                    tooltip: 'Good response',
+                    onTap: () {
+                      // Handle thumbs up feedback
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Thanks for your feedback!'),
+                          duration: const Duration(seconds: 2),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                          margin: const EdgeInsets.all(8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    },
+                    theme: theme,
+                  ),
+                  const SizedBox(width: 4),
+                  _buildMessageActionButton(
+                    icon: Icons.thumb_down_outlined,
+                    tooltip: 'Poor response',
+                    onTap: () {
+                      // Handle thumbs down feedback
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Thanks for your feedback. We\'ll improve!'),
+                          duration: const Duration(seconds: 2),
+                          backgroundColor: Colors.orange,
+                          behavior: SnackBarBehavior.floating,
+                          margin: const EdgeInsets.all(8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    },
+                    theme: theme,
+                  ),
+                ],
+              ),
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMessageActionButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    required ThemeData theme,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Tooltip(
+          message: tooltip,
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            child: Icon(
+              icon,
+              size: 18,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
       ),
     );
   }
