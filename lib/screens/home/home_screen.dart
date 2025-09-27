@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/workspace_provider.dart';
 import '../../providers/flow_assistant_provider.dart';
+import '../../providers/addon_provider.dart';
 import '../../sdk/models/flow_assistant.dart';
 import '../../sdk/models/workspace.dart';
 import '../../widgets/markdown/fh_markdown.dart';
@@ -21,6 +22,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   bool _isSidebarCollapsed = false;
+  bool _isInSettingsMenu = false;
   late AnimationController _sidebarAnimationController;
   late Animation<double> _sidebarAnimation;
 
@@ -57,20 +59,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       selectedIcon: Icons.smart_toy,
       label: 'AI Agents',
     ),
+  ];
+
+  // Settings item separated to be placed at the bottom
+  _NavigationItem get _settingsItem => _NavigationItem(
+    icon: Icons.settings_outlined,
+    selectedIcon: Icons.settings,
+    label: 'Settings',
+  );
+
+  List<_NavigationItem> get _settingsMenuItems => [
     _NavigationItem(
-      icon: Icons.schedule_outlined,
-      selectedIcon: Icons.schedule,
-      label: 'Triggers',
+      icon: Icons.arrow_back,
+      selectedIcon: Icons.arrow_back,
+      label: 'Back',
     ),
     _NavigationItem(
       icon: Icons.hub_outlined,
       selectedIcon: Icons.hub,
-      label: 'Integrations',
+      label: 'Connectors',
     ),
     _NavigationItem(
-      icon: Icons.settings_outlined,
-      selectedIcon: Icons.settings,
-      label: 'Settings',
+      icon: Icons.extension_outlined,
+      selectedIcon: Icons.extension,
+      label: 'Addons',
     ),
   ];
 
@@ -354,77 +366,157 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
                 // Navigation Items
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: _navigationItems.length,
-                    itemBuilder: (context, index) {
-                      final item = _navigationItems[index];
-                      final isSelected = _selectedIndex == index;
+                  child: Column(
+                    children: [
+                      // Main navigation items or settings menu
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: _isInSettingsMenu ? _settingsMenuItems.length : _navigationItems.length,
+                          itemBuilder: (context, index) {
+                            final items = _isInSettingsMenu ? _settingsMenuItems : _navigationItems;
+                            final item = items[index];
+                            final isSelected = _selectedIndex == index;
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 2,
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              if (index == 0 && _isInConversation) {
-                                // Handle new chat
-                                _handleNewChat();
-                              } else {
-                                setState(() {
-                                  _selectedIndex = index;
-                                });
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: _isSidebarCollapsed ? 8 : 16,
-                                vertical: 12,
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 2,
                               ),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                                    : null,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: _isSidebarCollapsed
-                                  ? MainAxisAlignment.center
-                                  : MainAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    isSelected ? item.selectedIcon : item.icon,
-                                    color: isSelected
-                                        ? theme.colorScheme.primary
-                                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                    size: 24,
-                                  ),
-                                  if (!_isSidebarCollapsed) ...[
-                                    const SizedBox(width: 16),
-                                    Text(
-                                      item.label,
-                                      style: TextStyle(
-                                        color: isSelected
-                                            ? theme.colorScheme.primary
-                                            : theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
-                                        fontSize: 15,
-                                      ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    if (_isInSettingsMenu) {
+                                      if (index == 0) {
+                                        // Back button
+                                        setState(() {
+                                          _isInSettingsMenu = false;
+                                          _selectedIndex = 0; // Go back to Home
+                                        });
+                                      } else {
+                                        setState(() {
+                                          _selectedIndex = index;
+                                        });
+                                      }
+                                    } else {
+                                      if (index == 0 && _isInConversation) {
+                                        // Handle new chat
+                                        _handleNewChat();
+                                      } else {
+                                        setState(() {
+                                          _selectedIndex = index;
+                                        });
+                                      }
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: _isSidebarCollapsed ? 8 : 16,
+                                      vertical: 12,
                                     ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected && !(_isInSettingsMenu && index == 0)
+                                          ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                                          : null,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: _isSidebarCollapsed
+                                        ? MainAxisAlignment.center
+                                        : MainAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          isSelected ? item.selectedIcon : item.icon,
+                                          color: (_isInSettingsMenu && index == 0)
+                                              ? theme.colorScheme.onSurface.withValues(alpha: 0.6)
+                                              : isSelected
+                                                  ? theme.colorScheme.primary
+                                                  : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                          size: 24,
+                                        ),
+                                        if (!_isSidebarCollapsed) ...[
+                                          const SizedBox(width: 16),
+                                          Text(
+                                            item.label,
+                                            style: TextStyle(
+                                              color: (_isInSettingsMenu && index == 0)
+                                                  ? theme.colorScheme.onSurface.withValues(alpha: 0.8)
+                                                  : isSelected
+                                                      ? theme.colorScheme.primary
+                                                      : theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                                              fontWeight: isSelected && !(_isInSettingsMenu && index == 0)
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      // Settings button at the bottom (only in main menu)
+                      if (!_isInSettingsMenu) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 2,
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _isInSettingsMenu = true;
+                                  _selectedIndex = 2; // Select Addons by default
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: _isSidebarCollapsed ? 8 : 16,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: _isSidebarCollapsed
+                                    ? MainAxisAlignment.center
+                                    : MainAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      _settingsItem.icon,
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                      size: 24,
+                                    ),
+                                    if (!_isSidebarCollapsed) ...[
+                                      const SizedBox(width: 16),
+                                      Text(
+                                        _settingsItem.label,
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                                          fontWeight: FontWeight.normal,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      );
-                    },
+                        const SizedBox(height: 8),
+                      ],
+                    ],
                   ),
                 ),
 
@@ -547,26 +639,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Widget _buildContent() {
-    switch (_selectedIndex) {
-      case 0:
-        return _AIAssistantChat(
-          onConversationStateChanged: _updateConversationState,
-          // Use a stable key based on conversation state
-          key: ValueKey('chat_$_isInConversation'),
-        );
-      case 1:
-        return _buildComingSoonContent('AI Agents', Icons.smart_toy_outlined);
-      case 2:
-        return _buildComingSoonContent('Triggers', Icons.schedule_outlined);
-      case 3:
-        return _buildComingSoonContent('Integrations', Icons.hub_outlined);
-      case 4:
-        return _buildComingSoonContent('Settings', Icons.settings_outlined);
-      default:
-        return _AIAssistantChat(
-          onConversationStateChanged: _updateConversationState,
-          key: ValueKey('chat_$_isInConversation'),
-        );
+    if (_isInSettingsMenu) {
+      switch (_selectedIndex) {
+        case 0: // Back - should not show content
+          return Container();
+        case 1: // Connectors
+          return _buildConnectorsContent();
+        case 2: // Addons
+          return _buildAddonsContent();
+        default:
+          return Container();
+      }
+    } else {
+      switch (_selectedIndex) {
+        case 0:
+          return _AIAssistantChat(
+            onConversationStateChanged: _updateConversationState,
+            // Use a stable key based on conversation state
+            key: ValueKey('chat_$_isInConversation'),
+          );
+        case 1:
+          return _buildComingSoonContent('AI Agents', Icons.smart_toy_outlined);
+        case 2: // Settings - should not show content, handled by menu switch
+          return Container();
+        default:
+          return _AIAssistantChat(
+            onConversationStateChanged: _updateConversationState,
+            key: ValueKey('chat_$_isInConversation'),
+          );
+      }
     }
   }
 
@@ -615,6 +716,467 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildConnectorsContent() {
+    final theme = Theme.of(context);
+    final workspaceState = ref.watch(workspaceProvider);
+
+    return Container(
+      color: theme.colorScheme.surface.withValues(alpha: 0.3),
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Icon(
+                Icons.hub,
+                size: 32,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Connectors',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Connect your workspace to external services',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+
+          // Current Workspace Info
+          if (workspaceState.currentWorkspace != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.dividerColor.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.business,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.8),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Current Workspace',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      Text(
+                        workspaceState.currentWorkspace!.workspaceName,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Coming Soon Message
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Icon(
+                      Icons.hub_outlined,
+                      size: 64,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Connectors',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Coming Soon',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Connect to Slack, Discord, Telegram, and more',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Integrations will be available in a future update',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddonsContent() {
+    final theme = Theme.of(context);
+    final addonState = ref.watch(addonProvider);
+    final workspaceState = ref.watch(workspaceProvider);
+
+    return Container(
+      color: theme.colorScheme.surface.withValues(alpha: 0.3),
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Icon(
+                Icons.extension,
+                size: 32,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Addons',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Manage workspace addons and features',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+
+          // Current Workspace Info
+          if (workspaceState.currentWorkspace != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.dividerColor.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.business,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.8),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Current Workspace',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      Text(
+                        workspaceState.currentWorkspace!.workspaceName,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Active Addon
+          if (addonState.activeAddon != null) ...[
+            Text(
+              'Active Addon',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary.withValues(alpha: 0.1),
+                    theme.colorScheme.primary.withValues(alpha: 0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.check_circle,
+                      color: theme.colorScheme.primary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          addonState.activeAddon!.name,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          addonState.activeAddon!.description,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+
+          // Available Addons List
+          Text(
+            'Available Addons',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (addonState.isLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (addonState.availableAddons.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.dividerColor.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 48,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No addons available',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: GridView.builder(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 300,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 1.5,
+                ),
+                itemCount: addonState.availableAddons.length,
+                itemBuilder: (context, index) {
+                  final addon = addonState.availableAddons[index];
+                  final isActive = addon.id == addonState.activeAddon?.id;
+
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isActive
+                            ? theme.colorScheme.primary
+                            : theme.dividerColor.withValues(alpha: 0.2),
+                        width: isActive ? 2 : 1,
+                      ),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: isActive
+                            ? null
+                            : () {
+                                ref.read(addonProvider.notifier).activateAddon(addon.id);
+                              },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.extension,
+                                    color: isActive
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      addon.name,
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: isActive
+                                            ? theme.colorScheme.primary
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isActive)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        'Active',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              Text(
+                                addon.description,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+          // Info message
+          if (!addonState.isLoading && addonState.availableAddons.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Each workspace has at least one addon activated. The UI and features change based on the selected addon.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
