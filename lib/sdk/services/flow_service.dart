@@ -72,8 +72,12 @@ class FlowService {
     bool streamResponse = false,
   }) async {
     try {
-      _logger.d('Invoking flow: $flowId in workspace: $workspaceId');
-      _logger.d('Flow input: $flowInput');
+      _logger.i('===== INVOKE FLOW (NORMAL) =====');
+      _logger.i('Flow ID received as parameter: $flowId');
+      _logger.i('Workspace ID: $workspaceId');
+      _logger.i('Flow input: $flowInput');
+      _logger.i('URL path will be: /flows/$flowId/invoke');
+      _logger.i('Query params: workspace_id=$workspaceId');
 
       // Send data directly without wrapping in FlowInvokeRequest
       // API expects: {human_input: "value", stream_response: false}
@@ -83,7 +87,8 @@ class FlowService {
         'stream_response': streamResponse,
       };
 
-      _logger.d('Request data being sent: $requestData');
+      _logger.i('Request body: $requestData');
+      _logger.i('================================');
 
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/flows/$flowId/invoke',
@@ -113,8 +118,12 @@ class FlowService {
     bool streamResponse = false,
   }) async {
     try {
-      _logger.d('Invoking flow as singleton: $flowId in workspace: $workspaceId');
-      _logger.d('Flow input: $flowInput');
+      _logger.i('===== INVOKE FLOW (SINGLETON) =====');
+      _logger.i('Flow ID received as parameter: $flowId');
+      _logger.i('Workspace ID: $workspaceId');
+      _logger.i('Flow input: $flowInput');
+      _logger.i('URL path will be: /flows/$flowId/invoke_singleton');
+      _logger.i('Query params: workspace_id=$workspaceId');
 
       // Send data directly without wrapping in FlowInvokeRequest
       // API expects: {human_input: "value", stream_response: false}
@@ -124,7 +133,8 @@ class FlowService {
         'stream_response': streamResponse,
       };
 
-      _logger.d('Request data being sent: $requestData');
+      _logger.i('Request body: $requestData');
+      _logger.i('===================================');
 
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/flows/$flowId/invoke_singleton',
