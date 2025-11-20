@@ -2,10 +2,14 @@ class AppConstants {
   // App Info
   static const String appName = 'FlowHunt Desktop';
   static const String appVersion = '1.0.0';
-  
+
+  // API Configuration
+  static const String apiBaseUrl = 'https://api.flowhunt.io/v2';
+  static const Duration apiTimeout = Duration(seconds: 30);
+
   // OAuth Configuration
-  static const String authorizationEndpoint = 'http://localhost:9010/v2/auth/oauth/authorize';
-  static const String tokenEndpoint = 'http://localhost:9010/v2/auth/oauth/token';
+  static const String authorizationEndpoint = '$apiBaseUrl/auth/oauth/authorize';
+  static const String tokenEndpoint = '$apiBaseUrl/auth/oauth/token';
   static const String clientId = 'flowhunt_desktop_client';
   static const String clientType = 'desktop_native'; // Explicitly identify as desktop app
   
@@ -19,10 +23,7 @@ class AppConstants {
   
   static const List<String> scopes = ['profile', 'agents', 'integrations'];
   
-  // API Configuration
-  static const String apiBaseUrl = 'http://localhost:9010/v2';
-  static const Duration apiTimeout = Duration(seconds: 30);
-  
+
   // Storage Keys
   static const String accessTokenKey = 'access_token';
   static const String refreshTokenKey = 'refresh_token';

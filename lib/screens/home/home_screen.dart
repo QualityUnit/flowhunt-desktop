@@ -1408,9 +1408,11 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                         // FlowHunt Logo/Icon
                         Container(
                           width: 80,
@@ -1559,6 +1561,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                           ],
                         ),
                       ],
+                      ),
                     ),
                   ),
                 ),
