@@ -2128,6 +2128,22 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         'human_input': task.flowInput['input'],
       };
 
+      // Log API call details
+      _logger.i('=== API Call Details ===');
+      _logger.i('Execution mode: ${_useSingleton ? "Singleton" : "Normal"}');
+      _logger.i('Workspace ID: $workspaceId');
+      _logger.i('Flow ID: ${_selectedFlow!.flowId}');
+      _logger.i('Flow Name: ${_selectedFlow!.name}');
+      _logger.i('API Parameters: $apiFlowInput');
+      _logger.i('Stream Response: false');
+
+      // Construct the URL that will be called (for debugging)
+      final endpoint = _useSingleton
+        ? '/api/v1/flows/${_selectedFlow!.flowId}/invoke-singleton'
+        : '/api/v1/flows/${_selectedFlow!.flowId}/invoke';
+      _logger.i('API Endpoint: $endpoint');
+      _logger.i('=======================');
+
       // Invoke the flow - this returns immediately with task_id and PENDING status
       final initialResponse = _useSingleton
         ? await flowService.invokeFlowSingleton(
@@ -2192,6 +2208,17 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       while (attempts < maxAttempts && _isExecuting && !task.shouldCancel) {
         await Future.delayed(pollInterval);
         attempts++;
+
+        // Log status check API call
+        if (attempts == 1 || attempts % 10 == 0) {
+          _logger.i('=== Status Check API Call ===');
+          _logger.i('Attempt: $attempts');
+          _logger.i('Workspace ID: $workspaceId');
+          _logger.i('Flow ID: ${_selectedFlow!.flowId}');
+          _logger.i('Task ID: $taskId');
+          _logger.i('API Endpoint: /api/v1/flows/${_selectedFlow!.flowId}/tasks/$taskId');
+          _logger.i('============================');
+        }
 
         final statusResponse = await flowService.checkTaskStatus(
           flowId: _selectedFlow!.flowId!,
