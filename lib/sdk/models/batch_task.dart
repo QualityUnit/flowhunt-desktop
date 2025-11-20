@@ -7,6 +7,7 @@ class BatchTask {
   String? error;
   double? credits; // Credits used (from API result)
   String? rawOutput; // Raw API response for debugging
+  String? taskId; // API task ID from flow execution
   DateTime? startTime;
   DateTime? endTime;
   bool shouldCancel = false; // Flag to signal task cancellation
@@ -20,17 +21,19 @@ class BatchTask {
     this.error,
     this.credits,
     this.rawOutput,
+    this.taskId,
     this.startTime,
     this.endTime,
     this.shouldCancel = false,
   });
 
-  // Calculate duration if both start and end times are available
+  // Calculate duration if start time is available
+  // If task is still running (no end time), calculate duration up to now
   Duration? get duration {
-    if (startTime != null && endTime != null) {
-      return endTime!.difference(startTime!);
-    }
-    return null;
+    if (startTime == null) return null;
+
+    final end = endTime ?? DateTime.now();
+    return end.difference(startTime!);
   }
 
   // Format duration as human-readable string
@@ -65,6 +68,7 @@ class BatchTask {
     'error': error,
     'credits': credits,
     'raw_output': rawOutput,
+    'task_id': taskId,
     'start_time': startTime?.toIso8601String(),
     'end_time': endTime?.toIso8601String(),
   };
@@ -78,6 +82,7 @@ class BatchTask {
     error: json['error'] as String?,
     credits: json['credits'] as double?,
     rawOutput: json['raw_output'] as String?,
+    taskId: json['task_id'] as String?,
     startTime: json['start_time'] != null ? DateTime.parse(json['start_time'] as String) : null,
     endTime: json['end_time'] != null ? DateTime.parse(json['end_time'] as String) : null,
   );

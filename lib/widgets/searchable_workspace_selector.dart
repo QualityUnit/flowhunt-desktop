@@ -46,6 +46,7 @@ class _SearchableWorkspaceSelectorState extends State<SearchableWorkspaceSelecto
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.business_outlined,
@@ -53,7 +54,7 @@ class _SearchableWorkspaceSelectorState extends State<SearchableWorkspaceSelecto
               color: theme.colorScheme.primary,
             ),
             const SizedBox(width: 8),
-            Expanded(
+            Flexible(
               child: widget.currentWorkspace != null
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,6 +76,7 @@ class _SearchableWorkspaceSelectorState extends State<SearchableWorkspaceSelecto
                                   : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                               fontSize: 10,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                       ],
                     )
@@ -83,8 +85,10 @@ class _SearchableWorkspaceSelectorState extends State<SearchableWorkspaceSelecto
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
             ),
+            const SizedBox(width: 4),
             Icon(
               Icons.arrow_drop_down,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.6),

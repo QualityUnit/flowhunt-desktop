@@ -29,7 +29,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   int _parallelExecutions = 5;
   bool _isExecuting = false;
   bool _useSingleton = true; // Singleton mode is default
-  bool _writeOutputToFile = false; // Write output to file option
+  bool _writeOutputToFile = true; // Write output to file option (enabled by default)
   String _outputDirectory = Directory.current.path; // Default to current directory
   bool _isDragging = false; // Track drag over state
 
@@ -135,6 +135,10 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
           Expanded(
             child: Stepper(
               currentStep: _currentStep,
+              onStepTapped: (step) {
+                // Allow navigation to any step by clicking on the step title
+                setState(() => _currentStep = step);
+              },
               onStepContinue: _currentStep < 3 ? () {
                 if (_currentStep == 0 && _selectedFlow == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -438,24 +442,46 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
               Row(
                 children: [
                   Icon(
-                    _useSingleton ? Icons.lock_outlined : Icons.lock_open_outlined,
+                    Icons.settings_outlined,
                     size: 20,
                     color: theme.colorScheme.primary,
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Execution Mode',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  Text(
+                    'Execution Mode:',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Switch(
-                    value: _useSingleton,
-                    onChanged: (value) {
-                      setState(() => _useSingleton = value);
-                    },
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButton<bool>(
+                      value: _useSingleton,
+                      underline: const SizedBox(),
+                      isDense: true,
+                      items: const [
+                        DropdownMenuItem(
+                          value: true,
+                          child: Text('Single Execution'),
+                        ),
+                        DropdownMenuItem(
+                          value: false,
+                          child: Text('Normal'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _useSingleton = value);
+                        }
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -879,60 +905,63 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                   ),
                 ),
                 // Table rows
-                ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _tasks.length,
-                  itemBuilder: (context, index) {
-                    final task = _tasks[index];
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(
-                            color: theme.colorScheme.outline.withValues(alpha: 0.2),
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: InkWell(
-                              onTap: () => _editTaskInput(index),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                child: Text(
-                                  task.flowInput['input']?.toString() ?? '',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
+                SizedBox(
+                  height: 400,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _tasks.length,
+                    itemBuilder: (context, index) {
+                      final task = _tasks[index];
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: theme.colorScheme.outline.withValues(alpha: 0.2),
                             ),
                           ),
-                          if (_writeOutputToFile)
+                        ),
+                        child: Row(
+                          children: [
                             Expanded(
+                              flex: 2,
                               child: InkWell(
-                                onTap: () => _editTaskFilename(index),
+                                onTap: () => _editTaskInput(index),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 8),
                                   child: Text(
-                                    task.filename ?? '-',
-                                    maxLines: 1,
+                                    task.flowInput['input']?.toString() ?? '',
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ),
                             ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () {
-                              setState(() => _tasks.removeAt(index));
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                            if (_writeOutputToFile)
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _editTaskFilename(index),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    child: Text(
+                                      task.filename ?? '-',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () {
+                                setState(() => _tasks.removeAt(index));
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
@@ -1059,23 +1088,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                     ),
                     Expanded(
                       child: Text(
-                        'Start',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'End',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Duration',
+                        'Time',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -1161,46 +1174,44 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                 ),
                               ),
                             ),
-                          Expanded(
+                          SizedBox(
+                            width: 50,
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Expanded(
-                                  child: _buildStatusBadge(task.status, theme),
-                                ),
+                                _buildStatusBadge(task, theme),
+                                const SizedBox(width: 4),
                                 if (task.status == 'waiting' || task.status == 'pending') ...[
-                                  const SizedBox(width: 4),
                                   IconButton(
                                     icon: const Icon(Icons.play_arrow, size: 16),
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(
-                                      minWidth: 24,
-                                      minHeight: 24,
+                                      minWidth: 20,
+                                      minHeight: 20,
                                     ),
                                     tooltip: 'Start task',
                                     onPressed: () => _startSingleTask(task),
                                   ),
                                 ],
                                 if (task.status == 'queued') ...[
-                                  const SizedBox(width: 4),
                                   IconButton(
                                     icon: const Icon(Icons.stop, size: 16),
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(
-                                      minWidth: 24,
-                                      minHeight: 24,
+                                      minWidth: 20,
+                                      minHeight: 20,
                                     ),
                                     tooltip: 'Stop task',
                                     onPressed: () => _stopSingleTask(task),
                                   ),
                                 ],
                                 if (task.status == 'done' || task.status == 'failed') ...[
-                                  const SizedBox(width: 4),
                                   IconButton(
                                     icon: const Icon(Icons.refresh, size: 16),
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(
-                                      minWidth: 24,
-                                      minHeight: 24,
+                                      minWidth: 20,
+                                      minHeight: 20,
                                     ),
                                     tooltip: 'Retry task',
                                     onPressed: () => _retryTask(task),
@@ -1210,25 +1221,25 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                             ),
                           ),
                           Expanded(
-                            child: Text(
-                              task.startTime != null
-                                ? '${task.startTime!.hour.toString().padLeft(2, '0')}:${task.startTime!.minute.toString().padLeft(2, '0')}:${task.startTime!.second.toString().padLeft(2, '0')}'
-                                : '-',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              task.endTime != null
-                                ? '${task.endTime!.hour.toString().padLeft(2, '0')}:${task.endTime!.minute.toString().padLeft(2, '0')}:${task.endTime!.second.toString().padLeft(2, '0')}'
-                                : '-',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              task.durationDecimal,
-                              style: theme.textTheme.bodySmall,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Start - End time
+                                Text(
+                                  task.startTime != null
+                                    ? '${task.startTime!.hour.toString().padLeft(2, '0')}:${task.startTime!.minute.toString().padLeft(2, '0')}:${task.startTime!.second.toString().padLeft(2, '0')} - ${task.endTime != null ? '${task.endTime!.hour.toString().padLeft(2, '0')}:${task.endTime!.minute.toString().padLeft(2, '0')}:${task.endTime!.second.toString().padLeft(2, '0')}' : '...'}'
+                                    : '-',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                // Duration on second line
+                                Text(
+                                  task.durationDecimal,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           Expanded(
@@ -1243,21 +1254,26 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                             flex: 3,
                             child: Row(
                               children: [
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: () => _showOutputDialog(task),
-                                    child: Text(
-                                      task.error ?? task.result ?? '-',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: task.error != null
-                                          ? theme.colorScheme.error
-                                          : theme.colorScheme.onSurface,
-                                      ),
+                                // View icon - shown if there's any output (result or error)
+                                if (task.result != null || task.error != null) ...[
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.visibility_outlined,
+                                      size: 16,
+                                      color: task.error != null
+                                        ? theme.colorScheme.error
+                                        : theme.colorScheme.primary,
                                     ),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 24,
+                                      minHeight: 24,
+                                    ),
+                                    tooltip: task.error != null ? 'View error' : 'View output',
+                                    onPressed: () => _showOutputDialog(task),
                                   ),
-                                ),
+                                ],
+                                // Save to file icon - shown if write to file is enabled and task succeeded
                                 if (task.status == 'done' && task.result != null && _writeOutputToFile) ...[
                                   const SizedBox(width: 4),
                                   IconButton(
@@ -1308,45 +1324,41 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String status, ThemeData theme) {
-    Color backgroundColor;
-    Color textColor;
+  Widget _buildStatusBadge(BatchTask task, ThemeData theme) {
+    Color dotColor;
 
-    switch (status) {
+    switch (task.status) {
       case 'pending':
       case 'waiting':
-        backgroundColor = Colors.grey.withValues(alpha: 0.2);
-        textColor = Colors.grey;
+        dotColor = Colors.grey;
         break;
       case 'queued':
-        backgroundColor = Colors.blue.withValues(alpha: 0.2);
-        textColor = Colors.blue;
+        dotColor = Colors.blue;
         break;
       case 'done':
-        backgroundColor = Colors.green.withValues(alpha: 0.2);
-        textColor = Colors.green;
+        dotColor = Colors.green;
         break;
       case 'failed':
-        backgroundColor = Colors.red.withValues(alpha: 0.2);
-        textColor = Colors.red;
+        dotColor = Colors.red;
         break;
       default:
-        backgroundColor = theme.colorScheme.surfaceContainerHighest;
-        textColor = theme.colorScheme.onSurface;
+        dotColor = theme.colorScheme.onSurface.withValues(alpha: 0.5);
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        status,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: textColor,
+    // Build tooltip text
+    String tooltipText = task.status;
+    if (task.taskId != null && task.status == 'queued') {
+      tooltipText = 'Task ID: ${task.taskId}';
+    }
+
+    return Tooltip(
+      message: tooltipText,
+      child: Container(
+        width: 12,
+        height: 12,
+        decoration: BoxDecoration(
+          color: dotColor,
+          shape: BoxShape.circle,
         ),
       ),
     );
@@ -1495,7 +1507,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                             'Status: ',
                             style: theme.textTheme.bodySmall,
                           ),
-                          _buildStatusBadge(task.status, theme),
+                          _buildStatusBadge(task, theme),
                         ],
                       ),
                     ],
@@ -2136,30 +2148,39 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         throw Exception('No task ID returned from flow invocation');
       }
 
+      // Store the task ID
+      setState(() {
+        task.taskId = taskId;
+      });
+
       _logger.i('Flow invoked, task ID: $taskId, initial status: ${initialResponse.status}');
 
       // If status is already completed (SUCCESS/FAILED) or result is available, no need to poll
       if (initialResponse.status != 'PENDING' || initialResponse.result != null) {
-        final isSuccess = initialResponse.status == 'SUCCESS' ||
-                         (initialResponse.result != null && initialResponse.errorMessage == null);
-        setState(() {
-          task.status = isSuccess ? 'done' : 'failed';
-          task.endTime = DateTime.now();
-          if (isSuccess) {
+        if (initialResponse.status == 'SUCCESS') {
+          setState(() {
+            task.status = 'done';
+            task.endTime = DateTime.now();
             task.result = initialResponse.aiAnswer ??
+                         initialResponse.errorMessage ??
                          'Task $taskId - ${initialResponse.status}';
             task.credits = initialResponse.credits;
             // Store raw API response
             task.rawOutput = jsonEncode(initialResponse.toJson());
-          } else {
-            task.error = initialResponse.errorMessage ??
-                        'Task failed: ${initialResponse.status}';
+          });
+          _logger.i('Task ${task.id} completed immediately: $taskId');
+          return;
+        } else if (initialResponse.status == 'FAILED' || initialResponse.status == 'ERROR') {
+          setState(() {
+            task.status = 'failed';
+            task.endTime = DateTime.now();
+            task.error = initialResponse.errorMessage ?? 'Task failed: ${initialResponse.status}';
             // Store raw API response even for errors
             task.rawOutput = jsonEncode(initialResponse.toJson());
-          }
-        });
-        _logger.i('Task ${task.id} completed immediately: $taskId');
-        return;
+          });
+          _logger.e('Task ${task.id} failed immediately: $taskId');
+          return;
+        }
       }
 
       // Poll for task completion
@@ -2203,11 +2224,18 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
           });
           _logger.e('Task ${task.id} failed after $attempts polls: $taskId');
           return;
-        }
-
-        // If still PENDING, trigger UI update to refresh duration display
-        if (mounted) {
-          setState(() {});
+        } else if (statusResponse.status == 'PENDING') {
+          // Task still pending, continue polling
+          // Trigger UI update to refresh duration display
+          if (mounted) {
+            setState(() {});
+          }
+        } else {
+          // Unexpected status - log warning and continue polling
+          _logger.w('Unexpected status for task $taskId: ${statusResponse.status}');
+          if (mounted) {
+            setState(() {});
+          }
         }
       }
 

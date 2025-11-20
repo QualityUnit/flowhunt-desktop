@@ -50,16 +50,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   List<_NavigationItem> get _navigationItems => [
-    _NavigationItem(
-      icon: _isInConversation ? Icons.add : Icons.home_outlined,
-      selectedIcon: _isInConversation ? Icons.add : Icons.home,
-      label: _isInConversation ? 'New Chat' : 'Home',
-    ),
-    _NavigationItem(
-      icon: Icons.smart_toy_outlined,
-      selectedIcon: Icons.smart_toy,
-      label: 'AI Agents',
-    ),
+    // Home - HIDDEN (not ready yet)
+    // _NavigationItem(
+    //   icon: _isInConversation ? Icons.add : Icons.home_outlined,
+    //   selectedIcon: _isInConversation ? Icons.add : Icons.home,
+    //   label: _isInConversation ? 'New Chat' : 'Home',
+    // ),
+    // AI Agents - HIDDEN (not ready yet)
+    // _NavigationItem(
+    //   icon: Icons.smart_toy_outlined,
+    //   selectedIcon: Icons.smart_toy,
+    //   label: 'AI Agents',
+    // ),
     _NavigationItem(
       icon: Icons.inventory_2_outlined,
       selectedIcon: Icons.inventory_2,
@@ -338,7 +340,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                                         // Back button
                                         setState(() {
                                           _isInSettingsMenu = false;
-                                          _selectedIndex = 0; // Go back to Home
+                                          _selectedIndex = 0; // Go back to Batch (only visible item)
                                         });
                                       } else {
                                         setState(() {
@@ -346,14 +348,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                                         });
                                       }
                                     } else {
-                                      if (index == 0 && _isInConversation) {
-                                        // Handle new chat
-                                        _handleNewChat();
-                                      } else {
-                                        setState(() {
-                                          _selectedIndex = index;
-                                        });
-                                      }
+                                      setState(() {
+                                        _selectedIndex = index;
+                                      });
                                     }
                                   },
                                   borderRadius: BorderRadius.circular(8),
@@ -384,18 +381,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                                         ),
                                         if (!_isSidebarCollapsed) ...[
                                           const SizedBox(width: 16),
-                                          Text(
-                                            item.label,
-                                            style: TextStyle(
-                                              color: (_isInSettingsMenu && index == 0)
-                                                  ? theme.colorScheme.onSurface.withValues(alpha: 0.8)
-                                                  : isSelected
-                                                      ? theme.colorScheme.primary
-                                                      : theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                                              fontWeight: isSelected && !(_isInSettingsMenu && index == 0)
-                                                  ? FontWeight.w600
-                                                  : FontWeight.normal,
-                                              fontSize: 15,
+                                          Flexible(
+                                            child: Text(
+                                              item.label,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: (_isInSettingsMenu && index == 0)
+                                                    ? theme.colorScheme.onSurface.withValues(alpha: 0.8)
+                                                    : isSelected
+                                                        ? theme.colorScheme.primary
+                                                        : theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                                                fontWeight: isSelected && !(_isInSettingsMenu && index == 0)
+                                                    ? FontWeight.w600
+                                                    : FontWeight.normal,
+                                                fontSize: 15,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -408,8 +408,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           },
                         ),
                       ),
-                      // Settings button at the bottom (only in main menu)
-                      if (!_isInSettingsMenu) ...[
+                      // Settings button at the bottom (only in main menu) - HIDDEN
+                      if (false) ...[
                         Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -598,23 +598,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       }
     } else {
       switch (_selectedIndex) {
-        case 0:
-          return _AIAssistantChat(
-            onConversationStateChanged: _updateConversationState,
-            // Use a stable key based on conversation state
-            key: ValueKey('chat_$_isInConversation'),
-          );
-        case 1:
-          return _buildComingSoonContent('AI Agents', Icons.smart_toy_outlined);
-        case 2:
+        case 0: // Batch (only visible menu item)
           return const BatchScreen();
-        case 3: // Settings - should not show content, handled by menu switch
-          return Container();
+        // case 0: // Home - HIDDEN (not ready yet)
+        //   return _AIAssistantChat(
+        //     onConversationStateChanged: _updateConversationState,
+        //     key: ValueKey('chat_$_isInConversation'),
+        //   );
+        // case 1: // AI Agents - HIDDEN (not ready yet)
+        //   return _buildComingSoonContent('AI Agents', Icons.smart_toy_outlined);
         default:
-          return _AIAssistantChat(
-            onConversationStateChanged: _updateConversationState,
-            key: ValueKey('chat_$_isInConversation'),
-          );
+          return const BatchScreen();
       }
     }
   }
