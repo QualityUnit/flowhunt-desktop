@@ -2,10 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:dio/dio.dart';
 import 'package:flowhunt_desktop/core/auth/auth_service.dart';
-import 'package:flowhunt_desktop/core/auth/token_storage.dart';
+import 'package:flowhunt_desktop/core/auth/token_storage_interface.dart';
 
 class MockDio extends Mock implements Dio {}
-class MockTokenStorage extends Mock implements TokenStorage {}
+class MockTokenStorage extends Mock implements TokenStorageInterface {}
 class MockResponse extends Mock implements Response {}
 
 void main() {

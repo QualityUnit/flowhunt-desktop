@@ -10,11 +10,10 @@ class FlowAssistantService {
 
   Timer? _pollTimer;
   String? _currentSessionId;
-  String? _lastMessageId;
   String _lastTimestamp = '0';
   int _pollingInterval = 500; // Start with 500ms
   int _pollingCounter = 0;
-  int _maxInterval = 5000; // Max 5 seconds
+  final int _maxInterval = 5000; // Max 5 seconds
 
   FlowAssistantService({
     required FlowHuntApiClient apiClient,
@@ -138,8 +137,6 @@ class FlowAssistantService {
           _lastTimestamp = maxTimestamp.toString();
         }
 
-        _lastMessageId = events.last.eventId;
-
         // Reset polling interval when we get events
         _pollingInterval = 500;
         _pollingCounter = 0;
@@ -225,7 +222,6 @@ class FlowAssistantService {
   void dispose() {
     _stopPolling();
     _currentSessionId = null;
-    _lastMessageId = null;
     _lastTimestamp = '0';
     _pollingInterval = 500;
     _pollingCounter = 0;

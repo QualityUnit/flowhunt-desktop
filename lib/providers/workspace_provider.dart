@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../sdk/api_client.dart';
 import '../sdk/models/workspace.dart';
 import '../sdk/services/workspace_service.dart';
 import 'user_provider.dart';
@@ -43,10 +42,9 @@ class WorkspaceState {
 // State notifier for managing workspace data
 class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
   final WorkspaceService _workspaceService;
-  final Ref _ref;
   static const String _currentWorkspaceKey = 'current_workspace_id';
 
-  WorkspaceNotifier(this._workspaceService, this._ref) : super(WorkspaceState());
+  WorkspaceNotifier(this._workspaceService) : super(WorkspaceState());
 
   Future<void> fetchWorkspaces() async {
     state = state.copyWith(isLoading: true, error: null);
@@ -101,7 +99,7 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
   Future<void> createWorkspace(String name) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final newWorkspace = await _workspaceService.createWorkspace(name);
+      await _workspaceService.createWorkspace(name);
 
       // Refresh the list to get the updated workspaces with roles
       await fetchWorkspaces();
@@ -200,5 +198,5 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
 // Provider for workspace state
 final workspaceProvider = StateNotifierProvider<WorkspaceNotifier, WorkspaceState>((ref) {
   final workspaceService = ref.watch(workspaceServiceProvider);
-  return WorkspaceNotifier(workspaceService, ref);
+  return WorkspaceNotifier(workspaceService);
 });

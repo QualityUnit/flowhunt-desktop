@@ -35,29 +35,58 @@ class FlowHuntApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          _logger.d('API Request: ${options.method} ${options.uri}');
+          if (options.data != null) {
+            _logger.d('Request data: ${options.data}');
+          }
+          if (options.queryParameters.isNotEmpty) {
+            _logger.d('Query parameters: ${options.queryParameters}');
+          }
+
           final token = await _authService.getAccessToken();
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
+            _logger.d('Added authorization token to request');
+          } else {
+            _logger.w('No access token available for request');
           }
           handler.next(options);
         },
+        onResponse: (response, handler) {
+          _logger.i('API Response: ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.uri}');
+          handler.next(response);
+        },
         onError: (error, handler) async {
+          _logger.e(
+            'API Request Error: ${error.requestOptions.method} ${error.requestOptions.uri}',
+            error: error,
+            stackTrace: error.stackTrace,
+          );
+          _logger.e('Status Code: ${error.response?.statusCode}');
+          _logger.e('Response Data: ${error.response?.data}');
+
           if (error.response?.statusCode == 401) {
+            _logger.w('Received 401 Unauthorized, attempting token refresh...');
             // Try to refresh token
             final refreshed = await _authService.refreshToken();
             if (refreshed) {
+              _logger.i('Token refresh successful, retrying request...');
               // Retry the request
               final token = await _authService.getAccessToken();
               error.requestOptions.headers['Authorization'] = 'Bearer $token';
 
               try {
                 final response = await _dio.fetch(error.requestOptions);
+                _logger.i('Retry successful after token refresh');
                 handler.resolve(response);
                 return;
               } catch (e) {
+                _logger.e('Retry failed after token refresh', error: e);
                 handler.reject(error);
                 return;
               }
+            } else {
+              _logger.e('Token refresh failed');
             }
           }
           handler.next(error);
@@ -197,9 +226,13 @@ class FlowHuntApiClient {
   Exception _handleError(DioException error) {
     String message = 'An error occurred';
 
+    _logger.e('Handling API error', error: error);
+
     if (error.response != null) {
       final statusCode = error.response!.statusCode;
       final data = error.response!.data;
+
+      _logger.e('Error response - Status: $statusCode, Data: $data');
 
       if (data is Map<String, dynamic>) {
         // Handle validation errors with detail field
@@ -209,14 +242,18 @@ class FlowHuntApiClient {
             // Parse validation error details
             final errors = detail.map((e) => '${e['loc']?.join('.')}: ${e['msg']}').join(', ');
             message = errors;
+            _logger.e('Validation errors: $errors');
           } else if (detail is String) {
             message = detail;
+            _logger.e('Error detail: $detail');
           }
         } else {
           message = data['message'] ?? data['error'] ?? message;
+          _logger.e('Error message: $message');
         }
       } else if (data is String) {
         message = data;
+        _logger.e('Error string: $message');
       }
 
       _logger.e('API Error [$statusCode]: $message');
@@ -242,9 +279,13 @@ class FlowHuntApiClient {
       }
     } else if (error.type == DioExceptionType.connectionTimeout ||
                error.type == DioExceptionType.receiveTimeout) {
+      _logger.e('Request timeout: ${error.type}');
       return TimeoutException('Request timeout');
     } else if (error.type == DioExceptionType.connectionError) {
+      _logger.e('Network connection error: ${error.message}');
       return NetworkException('Network error');
+    } else {
+      _logger.e('Unknown error type: ${error.type}, Message: ${error.message}');
     }
 
     return ApiException(message);

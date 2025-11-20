@@ -9,8 +9,9 @@ import '../../providers/workspace_provider.dart';
 import '../../providers/flow_assistant_provider.dart';
 import '../../providers/addon_provider.dart';
 import '../../sdk/models/flow_assistant.dart';
-import '../../sdk/models/workspace.dart';
 import '../../widgets/markdown/fh_markdown.dart';
+import '../../widgets/searchable_workspace_selector.dart';
+import '../batch/batch_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -58,6 +59,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       icon: Icons.smart_toy_outlined,
       selectedIcon: Icons.smart_toy,
       label: 'AI Agents',
+    ),
+    _NavigationItem(
+      icon: Icons.inventory_2_outlined,
+      selectedIcon: Icons.inventory_2,
+      label: 'Batch',
     ),
   ];
 
@@ -262,72 +268,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             );
                           }
 
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface,
-                              border: Border.all(
-                                color: theme.dividerColor.withValues(alpha: 0.2),
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<WorkspaceRole>(
-                                value: workspaceState.currentWorkspace,
-                                isExpanded: true,
-                                isDense: false,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                icon: Icon(
-                                  Icons.arrow_drop_down,
-                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                                items: workspaceState.workspaces.map((workspace) {
-                                  return DropdownMenuItem<WorkspaceRole>(
-                                    value: workspace,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.business_outlined,
-                                          size: 16,
-                                          color: theme.colorScheme.primary,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                workspace.workspaceName,
-                                                style: theme.textTheme.bodyMedium?.copyWith(
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              if (workspace.role != 'M')
-                                                Text(
-                                                  workspace.roleDisplayName,
-                                                  style: theme.textTheme.bodySmall?.copyWith(
-                                                    color: workspace.isOwner || workspace.isAdmin
-                                                        ? theme.colorScheme.primary
-                                                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                                    fontSize: 10,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (workspace) {
-                                  if (workspace != null) {
-                                    ref.read(workspaceProvider.notifier).switchWorkspace(workspace);
-                                  }
-                                },
-                              ),
-                            ),
+                          return SearchableWorkspaceSelector(
+                            workspaces: workspaceState.workspaces,
+                            currentWorkspace: workspaceState.currentWorkspace,
+                            onChanged: (workspace) {
+                              ref.read(workspaceProvider.notifier).switchWorkspace(workspace);
+                            },
                           );
                         },
                       ),
@@ -660,7 +606,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           );
         case 1:
           return _buildComingSoonContent('AI Agents', Icons.smart_toy_outlined);
-        case 2: // Settings - should not show content, handled by menu switch
+        case 2:
+          return const BatchScreen();
+        case 3: // Settings - should not show content, handled by menu switch
           return Container();
         default:
           return _AIAssistantChat(
@@ -1214,7 +1162,6 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
   bool _hasStartedConversation = false;
   bool _isChatSidebarVisible = false; // Start with sidebar collapsed
   String _selectedModel = 'GPT-4';
-  final List<String> _availableModels = ['GPT-4', 'GPT-3.5', 'Claude', 'Gemini'];
   late String _mainPromptText;
   bool _lastReportedState = false; // Track last reported state to parent
 
@@ -1339,7 +1286,10 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
     String userName = 'there';
     if (mounted) {
       final userState = ref.read(userProvider);
-      userName = userState.user?.username?.split(' ').first ?? 'there';
+      final username = userState.user?.username;
+      if (username != null) {
+        userName = username.split(' ').first;
+      }
     }
 
     final prompts = [
@@ -2025,39 +1975,6 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
     );
   }
 
-  Widget _buildQuickAction(IconData icon, String label, VoidCallback onTap, ThemeData theme) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: theme.dividerColor.withValues(alpha: 0.2),
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildModernMessageBubble(ChatMessage message, ThemeData theme, bool isLastMessage) {
     final isUser = message.type == MessageType.human;
     final isError = message.type == MessageType.error;
@@ -2167,23 +2084,6 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
                             ),
                 ),
               ),
-              if (isUser && false) ...[
-                Container(
-                  margin: const EdgeInsets.only(left: 8),
-                  child: CircleAvatar(
-                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    radius: 16,
-                    child: Text(
-                      'Y',
-                      style: TextStyle(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
           // Action buttons for AI messages
@@ -2288,21 +2188,6 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
     );
   }
 
-  Widget _buildMessageAction(IconData icon, String tooltip, VoidCallback onTap, ThemeData theme) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        child: Icon(
-          icon,
-          size: 16,
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-        ),
-      ),
-    );
-  }
-
   Widget _buildTypingIndicator(ThemeData theme) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -2334,116 +2219,6 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMessageBubble(ChatMessage message, ThemeData theme) {
-    final isUser = message.type == MessageType.human;
-    final isError = message.type == MessageType.error;
-    final isLoading = message.type == MessageType.loading;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!isUser) ...[
-            CircleAvatar(
-              backgroundColor: isError
-                  ? theme.colorScheme.error.withValues(alpha: 0.1)
-                  : theme.colorScheme.primary.withValues(alpha: 0.1),
-              radius: 18,
-              child: Icon(
-                isError ? Icons.error_outline : Icons.smart_toy,
-                color: isError
-                    ? theme.colorScheme.error
-                    : theme.colorScheme.primary,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-          Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.65,
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              decoration: BoxDecoration(
-                color: isUser
-                    ? theme.colorScheme.primary
-                    : isError
-                        ? theme.colorScheme.error.withValues(alpha: 0.1)
-                        : theme.colorScheme.surface,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
-                ),
-                border: !isUser && !isError
-                    ? Border.all(
-                        color: theme.dividerColor.withValues(alpha: 0.2),
-                      )
-                    : null,
-              ),
-              child: isLoading
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              theme.colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Thinking...',
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    )
-                  : SelectableText(
-                      message.content,
-                      style: TextStyle(
-                        color: isUser
-                            ? Colors.white
-                            : isError
-                                ? theme.colorScheme.error
-                                : theme.colorScheme.onSurface,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-            ),
-          ),
-          if (isUser) ...[
-            const SizedBox(width: 12),
-            CircleAvatar(
-              backgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.1),
-              radius: 18,
-              child: Icon(
-                Icons.person,
-                color: theme.colorScheme.secondary,
-                size: 20,
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

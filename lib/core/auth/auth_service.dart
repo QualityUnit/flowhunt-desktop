@@ -5,7 +5,6 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -260,11 +259,19 @@ class AuthService {
       
       if (response.statusCode == 200) {
         final data = response.data;
+        final accessToken = data['access_token'] as String?;
+        final refreshToken = data['refresh_token'] as String?;
+
+        if (accessToken == null || refreshToken == null) {
+          _logger.e('Token exchange response missing tokens');
+          return false;
+        }
+
         await _tokenStorage.saveTokens(
-          accessToken: data['access_token'],
-          refreshToken: data['refresh_token'],
+          accessToken: accessToken,
+          refreshToken: refreshToken,
         );
-        
+
         _logger.i('Tokens saved successfully');
         return true;
       }
@@ -296,9 +303,17 @@ class AuthService {
       
       if (response.statusCode == 200) {
         final data = response.data;
+        final accessToken = data['access_token'] as String?;
+        final newRefreshToken = data['refresh_token'] as String?;
+
+        if (accessToken == null) {
+          _logger.e('Token refresh response missing access_token');
+          return false;
+        }
+
         await _tokenStorage.saveTokens(
-          accessToken: data['access_token'],
-          refreshToken: data['refresh_token'] ?? refreshToken,
+          accessToken: accessToken,
+          refreshToken: newRefreshToken ?? refreshToken,
         );
         return true;
       }

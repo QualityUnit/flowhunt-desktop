@@ -59,8 +59,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              theme.colorScheme.primary.withOpacity(0.8),
-              theme.colorScheme.secondary.withOpacity(0.8),
+              theme.colorScheme.primary.withValues(alpha: 0.8),
+              theme.colorScheme.secondary.withValues(alpha: 0.8),
             ],
           ),
         ),
@@ -83,7 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       height: 100,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.1),
+                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: SvgPicture.asset(
@@ -110,7 +110,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Text(
                       'Connect your account to get started',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -121,10 +121,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.error.withOpacity(0.1),
+                          color: theme.colorScheme.error.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: theme.colorScheme.error.withOpacity(0.3),
+                            color: theme.colorScheme.error.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Row(
@@ -200,10 +200,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           child: Text(
                             'Waiting for authentication? Click here to retry',
                             style: TextStyle(
-                              color: theme.colorScheme.primary.withOpacity(0.7),
+                              color: theme.colorScheme.primary.withValues(alpha: 0.7),
                               fontSize: 13,
                               decoration: TextDecoration.underline,
-                              decorationColor: theme.colorScheme.primary.withOpacity(0.5),
+                              decorationColor: theme.colorScheme.primary.withValues(alpha: 0.5),
                             ),
                           ),
                         ),
@@ -216,7 +216,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.05),
+                        color: theme.colorScheme.primary.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -231,7 +231,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             child: Text(
                               'You will be redirected to your browser to complete the sign-in process securely.',
                               style: TextStyle(
-                                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                                 fontSize: 13,
                               ),
                             ),
