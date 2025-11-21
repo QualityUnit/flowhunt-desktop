@@ -369,7 +369,21 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
           ],
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Loading flows...',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
       error: (error, stack) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -1176,7 +1190,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                       ),
                     ),
                     Expanded(
-                      flex: 3,
+                      flex: 4,
                       child: Text(
                         'Input Value',
                         style: theme.textTheme.titleSmall?.copyWith(
@@ -1203,6 +1217,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                       ),
                     ),
                     Expanded(
+                      flex: 2,
                       child: Text(
                         'Time',
                         style: theme.textTheme.titleSmall?.copyWith(
@@ -1219,7 +1234,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                       ),
                     ),
                     Expanded(
-                      flex: 3,
                       child: Text(
                         'Output',
                         style: theme.textTheme.titleSmall?.copyWith(
@@ -1260,7 +1274,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                             ),
                           ),
                           Expanded(
-                            flex: 3,
+                            flex: 4,
                             child: InkWell(
                               onTap: () => _editTaskInput(index),
                               child: Padding(
@@ -1337,6 +1351,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                             ),
                           ),
                           Expanded(
+                            flex: 2,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -1367,7 +1382,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                             ),
                           ),
                           Expanded(
-                            flex: 3,
                             child: Row(
                               children: [
                                 // View icon - shown if there's any output (result or error)
@@ -1441,15 +1455,33 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   }
 
   Widget _buildStatusBadge(BatchTask task, ThemeData theme) {
-    Color dotColor;
+    // Build tooltip text
+    String tooltipText = task.status;
+    if (task.taskId != null && task.status == 'queued') {
+      tooltipText = 'Task ID: ${task.taskId}';
+    }
 
+    // Show rotating loading indicator for queued tasks
+    if (task.status == 'queued') {
+      return Tooltip(
+        message: tooltipText,
+        child: const SizedBox(
+          width: 12,
+          height: 12,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+          ),
+        ),
+      );
+    }
+
+    // Show static colored dot for other statuses
+    Color dotColor;
     switch (task.status) {
       case 'pending':
       case 'waiting':
         dotColor = Colors.grey;
-        break;
-      case 'queued':
-        dotColor = Colors.blue;
         break;
       case 'done':
         dotColor = Colors.green;
@@ -1462,12 +1494,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         break;
       default:
         dotColor = theme.colorScheme.onSurface.withValues(alpha: 0.5);
-    }
-
-    // Build tooltip text
-    String tooltipText = task.status;
-    if (task.taskId != null && task.status == 'queued') {
-      tooltipText = 'Task ID: ${task.taskId}';
     }
 
     return Tooltip(
@@ -1509,7 +1535,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     final wasExecuting = _isExecuting;
     setState(() {
       _isExecuting = true;
-      // Reset task status
+      // Reset task status and all fields for fresh retry
       task.status = 'waiting';
       task.result = null;
       task.error = null;
@@ -1517,6 +1543,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       task.endTime = null;
       task.taskId = null;
       task.sessionId = null;
+      task.shouldCancel = false; // Reset cancel flag
+      task.credits = null;
+      task.rawOutput = null;
       task.processedEventIds.clear();
     });
 
@@ -2381,6 +2410,15 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
           _logger.i('Polling task ${task.id} (attempt $attempts)');
         }
 
+        // Check if this is a session task (withSession mode)
+        if (task.sessionId != null && _executionMode == ExecutionMode.withSession) {
+          // Poll session responses for withSession mode
+          await _pollSessionTask(task, flowService, workspaceId, attempts, runningTasks, runningTaskIds, pollAttempts, taskQueue, queueIndex);
+          currentPollIndex++;
+          continue;
+        }
+
+        // Regular task status polling for singleton/normal modes
         final statusResponse = await flowService.checkTaskStatus(
           flowId: _selectedFlow!.flowId!,
           taskId: taskIdToCheck,
@@ -2478,6 +2516,148 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     }
   }
 
+  // Helper method to poll a session task
+  Future<void> _pollSessionTask(
+    BatchTask task,
+    dynamic flowService,
+    String workspaceId,
+    int attempts,
+    Map<String, BatchTask> runningTasks,
+    List<String> runningTaskIds,
+    Map<String, int> pollAttempts,
+    List<BatchTask> taskQueue,
+    int queueIndex,
+  ) async {
+    try {
+      final sessionId = task.sessionId!;
+
+      // Initialize timestamp if not set
+      if (!task.processedEventIds.contains('_timestamp_initialized')) {
+        task.processedEventIds.add('_timestamp_initialized');
+        task.processedEventIds.add((DateTime.now().millisecondsSinceEpoch ~/ 1000).toString());
+      }
+
+      // Get the last timestamp
+      final lastTimestampStr = task.processedEventIds.lastWhere(
+        (id) => int.tryParse(id) != null,
+        orElse: () => (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString(),
+      );
+      int lastTimestamp = int.parse(lastTimestampStr);
+
+      final invocationResponse = await flowService.getSessionResponses(
+        sessionId: sessionId,
+        workspaceId: workspaceId,
+        fromTimestamp: lastTimestamp,
+      );
+
+      // Process messages
+      bool hasNewMessages = false;
+      bool completed = false;
+      List<Map<String, dynamic>> allMessages = [];
+
+      if (task.rawOutput != null && task.rawOutput!.isNotEmpty) {
+        try {
+          final existing = jsonDecode(task.rawOutput!) as List;
+          allMessages = existing.cast<Map<String, dynamic>>();
+        } catch (e) {
+          _logger.w('Failed to parse existing raw output: $e');
+        }
+      }
+
+      if (invocationResponse.messages != null) {
+        for (final message in invocationResponse.messages!) {
+          if (message.eventId != null && !task.processedEventIds.contains(message.eventId)) {
+            task.processedEventIds.add(message.eventId!);
+            allMessages.add(message.toJson());
+            hasNewMessages = true;
+
+            _logger.d('Task ${task.id} - New message: eventType=${message.eventType}, actionType=${message.actionType}');
+
+            // Check if this is an "ai" event_type - final result
+            if (message.eventType == 'ai') {
+              completed = true;
+              String? result;
+              double? credits;
+
+              if (message.metadata != null && message.metadata is Map<String, dynamic>) {
+                final metadata = message.metadata as Map<String, dynamic>;
+                if (metadata['message'] != null) {
+                  result = metadata['message'] as String?;
+                }
+              }
+
+              if (message.credits != null) {
+                credits = message.credits!.abs() / 1000000.0;
+              }
+
+              setState(() {
+                task.status = 'done';
+                task.endTime = DateTime.now();
+                task.result = result ?? 'Session completed';
+                task.credits = credits;
+                task.rawOutput = jsonEncode(allMessages);
+              });
+
+              _logger.i('Task ${task.id} completed via session after $attempts polls');
+              await _writeTaskOutputToFile(task);
+
+              // Remove from running tasks
+              runningTasks.remove(sessionId);
+              runningTaskIds.remove(sessionId);
+              pollAttempts.remove(sessionId);
+              return;
+            }
+
+            // Check for error
+            if (message.actionType == 'error' || message.eventType == 'error') {
+              completed = true;
+              String? errorMessage;
+              if (message.metadata != null && message.metadata is Map<String, dynamic>) {
+                final metadata = message.metadata as Map<String, dynamic>;
+                errorMessage = metadata['error_message'] as String? ?? metadata['message'] as String?;
+              }
+
+              setState(() {
+                task.status = 'failed';
+                task.endTime = DateTime.now();
+                task.error = errorMessage ?? 'Session failed';
+                task.rawOutput = jsonEncode(allMessages);
+              });
+
+              _logger.e('Task ${task.id} failed via session after $attempts polls');
+
+              // Remove from running tasks
+              runningTasks.remove(sessionId);
+              runningTaskIds.remove(sessionId);
+              pollAttempts.remove(sessionId);
+              return;
+            }
+          }
+        }
+      }
+
+      // Update raw output if we have new messages
+      if (hasNewMessages) {
+        setState(() {
+          task.rawOutput = jsonEncode(allMessages);
+        });
+      }
+
+      // Update last timestamp
+      if (invocationResponse.lastTimestamp != null) {
+        task.processedEventIds.removeWhere((id) => int.tryParse(id) != null);
+        task.processedEventIds.add(invocationResponse.lastTimestamp.toString());
+      }
+
+      // Trigger UI update
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e, stackTrace) {
+      _logger.e('Error polling session task ${task.id}', error: e, stackTrace: stackTrace);
+    }
+  }
+
   // Helper method to start a task and return its taskId
   Future<String?> _startTask(BatchTask task, dynamic flowService, String workspaceId) async {
     try {
@@ -2505,10 +2685,49 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       // Handle different execution modes
       if (_executionMode == ExecutionMode.withSession) {
-        // Session mode: create session, invoke, and poll for messages
-        // For now, we'll handle this separately as it has different polling logic
-        await _executeTaskWithSession(task, flowService, workspaceId);
-        return null; // Session tasks are self-contained
+        // Session mode: create session, invoke, and start polling in background
+        // We return the session ID immediately so the task is counted as running
+        try {
+          final inputMessage = task.flowInput['input']?.toString() ?? '';
+
+          // Step 1: Create a new session for this task
+          final sessionResponse = await flowService.createSession(
+            flowId: _selectedFlow!.flowId!,
+            workspaceId: workspaceId,
+          );
+
+          final sessionId = sessionResponse.sessionId;
+          if (sessionId == null) {
+            throw Exception('No session ID returned from session creation');
+          }
+
+          setState(() {
+            task.sessionId = sessionId;
+            task.taskId = sessionId; // Use sessionId as taskId for tracking
+          });
+
+          _logger.i('Session created for task ${task.id}: $sessionId');
+
+          // Step 2: Invoke the session with the message
+          await flowService.invokeSession(
+            sessionId: sessionId,
+            workspaceId: workspaceId,
+            message: inputMessage,
+          );
+
+          _logger.i('Session invoked for task ${task.id}, will poll in background');
+
+          // Return sessionId so this task is tracked as running
+          return sessionId;
+        } catch (e, stackTrace) {
+          _logger.e('Failed to start session for task ${task.id}', error: e, stackTrace: stackTrace);
+          setState(() {
+            task.status = 'failed';
+            task.endTime = DateTime.now();
+            task.error = e.toString();
+          });
+          return null;
+        }
       }
 
       // Convert 'input' to 'human_input' for API compatibility

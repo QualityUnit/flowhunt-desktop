@@ -273,6 +273,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           return SearchableWorkspaceSelector(
                             workspaces: workspaceState.workspaces,
                             currentWorkspace: workspaceState.currentWorkspace,
+                            isLoading: workspaceState.isLoading,
                             onChanged: (workspace) {
                               ref.read(workspaceProvider.notifier).switchWorkspace(workspace);
                             },

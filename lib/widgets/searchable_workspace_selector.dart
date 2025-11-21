@@ -5,12 +5,14 @@ class SearchableWorkspaceSelector extends StatefulWidget {
   final List<WorkspaceRole> workspaces;
   final WorkspaceRole? currentWorkspace;
   final ValueChanged<WorkspaceRole> onChanged;
+  final bool isLoading;
 
   const SearchableWorkspaceSelector({
     super.key,
     required this.workspaces,
     required this.currentWorkspace,
     required this.onChanged,
+    this.isLoading = false,
   });
 
   @override
@@ -55,38 +57,57 @@ class _SearchableWorkspaceSelectorState extends State<SearchableWorkspaceSelecto
             ),
             const SizedBox(width: 8),
             Flexible(
-              child: widget.currentWorkspace != null
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              child: widget.isLoading
+                  ? Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 8),
                         Text(
-                          widget.currentWorkspace!.workspaceName,
+                          'Loading workspaces...',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (widget.currentWorkspace!.role != 'M')
-                          Text(
-                            widget.currentWorkspace!.roleDisplayName,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: widget.currentWorkspace!.isOwner || widget.currentWorkspace!.isAdmin
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                              fontSize: 10,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
                       ],
                     )
-                  : Text(
-                      'Select workspace',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  : widget.currentWorkspace != null
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.currentWorkspace!.workspaceName,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (widget.currentWorkspace!.role != 'M')
+                              Text(
+                                widget.currentWorkspace!.roleDisplayName,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: widget.currentWorkspace!.isOwner || widget.currentWorkspace!.isAdmin
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                  fontSize: 10,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        )
+                      : Text(
+                          'Select workspace',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
             ),
             const SizedBox(width: 4),
             Icon(
