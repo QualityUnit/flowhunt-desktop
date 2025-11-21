@@ -34,7 +34,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   final List<BatchTask> _tasks = [];
   int _parallelExecutions = 5;
   bool _isExecuting = false;
-  ExecutionMode _executionMode = ExecutionMode.normal; // Normal mode is default
+  ExecutionMode _executionMode = ExecutionMode.withSession; // With Session mode is default
   bool _writeOutputToFile = true; // Write output to file option (enabled by default)
   bool _overwriteExistingFiles = false; // Overwrite existing files option (disabled by default)
   String _outputDirectory = Directory.current.path; // Default to current directory
@@ -2274,6 +2274,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     while (runningTasks.isNotEmpty && _isExecuting) {
       await Future.delayed(pollInterval);
 
+      // Yield to UI thread to prevent blocking
+      await Future.microtask(() {});
+
       if (runningTaskIds.isEmpty) break;
 
       // Dynamic adjustment: start tasks to fill up to parallel limit
@@ -2713,6 +2716,10 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       while (attempts < maxAttempts && _isExecuting && !task.shouldCancel) {
         await Future.delayed(pollInterval);
+
+        // Yield to UI thread to prevent blocking
+        await Future.microtask(() {});
+
         attempts++;
 
         // Log status check API call
@@ -2865,6 +2872,10 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       while (attempts < maxAttempts && _isExecuting && !task.shouldCancel && !completed) {
         await Future.delayed(pollInterval);
+
+        // Yield to UI thread to prevent blocking
+        await Future.microtask(() {});
+
         attempts++;
 
         try {
