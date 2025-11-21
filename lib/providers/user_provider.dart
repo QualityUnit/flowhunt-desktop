@@ -89,5 +89,12 @@ final userProvider = StateNotifierProvider<UserNotifier, UserState>((ref) {
 // Provider for API client with auth
 final apiClientProvider = Provider<FlowHuntApiClient>((ref) {
   final authService = ref.watch(authServiceProvider);
-  return FlowHuntApiClient(authService: authService);
+  final authErrorNotifier = ref.watch(authErrorProvider.notifier);
+
+  return FlowHuntApiClient(
+    authService: authService,
+    onAuthError: () {
+      authErrorNotifier.triggerAuthError();
+    },
+  );
 });

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/constants/app_constants.dart';
+import 'providers/auth_provider.dart';
+import 'providers/user_provider.dart';
+import 'providers/workspace_provider.dart';
 import 'router/app_router.dart';
 
 void main() async {
@@ -32,13 +35,30 @@ void main() async {
   );
 }
 
-class FlowHuntApp extends ConsumerWidget {
+class FlowHuntApp extends ConsumerStatefulWidget {
   const FlowHuntApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FlowHuntApp> createState() => _FlowHuntAppState();
+}
+
+class _FlowHuntAppState extends ConsumerState<FlowHuntApp> {
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
-    
+
+    // Listen for auth errors and navigate to login
+    ref.listen(authErrorProvider, (previous, next) {
+      if (next && mounted) {
+        // Clear user and workspace data on auth error
+        ref.read(userProvider.notifier).clear();
+        ref.read(workspaceProvider.notifier).clear();
+
+        // Navigate to login
+        router.go('/login');
+      }
+    });
+
     return MaterialApp.router(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,

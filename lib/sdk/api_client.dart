@@ -11,10 +11,12 @@ class FlowHuntApiClient {
   final Dio _dio;
   final AuthService _authService;
   final Logger _logger = Logger();
+  final void Function()? onAuthError;
 
   FlowHuntApiClient({
     required AuthService authService,
     Dio? dio,
+    this.onAuthError,
   })  : _authService = authService,
         _dio = dio ?? Dio() {
     _configureDio();
@@ -87,6 +89,8 @@ class FlowHuntApiClient {
               }
             } else {
               _logger.e('Token refresh failed');
+              // Trigger auth error callback to show login dialog
+              onAuthError?.call();
             }
           }
           handler.next(error);
@@ -260,6 +264,8 @@ class FlowHuntApiClient {
 
       switch (statusCode) {
         case 401:
+          // Trigger auth error callback to show login dialog
+          onAuthError?.call();
           return UnauthorizedException(message);
         case 403:
           return ForbiddenException(message);

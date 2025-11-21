@@ -45,8 +45,16 @@ class AuthService {
   Future<bool> isAuthenticated() async {
     final token = await _tokenStorage.getAccessToken();
     if (token == null) return false;
-    
-    // TODO: Validate token expiry
+
+    // Check if token is expired
+    final isExpired = await _tokenStorage.isAccessTokenExpired();
+    if (isExpired) {
+      _logger.i('Access token is expired or near expiry, attempting refresh...');
+      // Try to refresh the token
+      final refreshed = await refreshToken();
+      return refreshed;
+    }
+
     return true;
   }
   
@@ -261,6 +269,7 @@ class AuthService {
         final data = response.data;
         final accessToken = data['access_token'] as String?;
         final refreshToken = data['refresh_token'] as String?;
+        final expiresIn = data['expires_in'] as int?;
 
         if (accessToken == null || refreshToken == null) {
           _logger.e('Token exchange response missing tokens');
@@ -270,9 +279,10 @@ class AuthService {
         await _tokenStorage.saveTokens(
           accessToken: accessToken,
           refreshToken: refreshToken,
+          expiresIn: expiresIn,
         );
 
-        _logger.i('Tokens saved successfully');
+        _logger.i('Tokens saved successfully (expires in: ${expiresIn}s)');
         return true;
       }
       
@@ -287,8 +297,13 @@ class AuthService {
   Future<bool> refreshToken() async {
     try {
       final refreshToken = await _tokenStorage.getRefreshToken();
-      if (refreshToken == null) return false;
-      
+      if (refreshToken == null) {
+        _logger.w('No refresh token available');
+        return false;
+      }
+
+      _logger.i('Attempting to refresh access token...');
+
       final response = await _dio.post(
         AppConstants.tokenEndpoint,
         data: {
@@ -300,11 +315,12 @@ class AuthService {
           contentType: Headers.formUrlEncodedContentType,
         ),
       );
-      
+
       if (response.statusCode == 200) {
         final data = response.data;
         final accessToken = data['access_token'] as String?;
         final newRefreshToken = data['refresh_token'] as String?;
+        final expiresIn = data['expires_in'] as int?;
 
         if (accessToken == null) {
           _logger.e('Token refresh response missing access_token');
@@ -314,10 +330,26 @@ class AuthService {
         await _tokenStorage.saveTokens(
           accessToken: accessToken,
           refreshToken: newRefreshToken ?? refreshToken,
+          expiresIn: expiresIn,
         );
+
+        _logger.i('Token refresh successful (expires in: ${expiresIn}s)');
         return true;
       }
-      
+
+      _logger.e('Token refresh failed with status: ${response.statusCode}');
+      return false;
+    } on DioException catch (e) {
+      _logger.e('Token refresh failed with DioException');
+      _logger.e('Status: ${e.response?.statusCode}');
+      _logger.e('Response data: ${e.response?.data}');
+
+      // If refresh token is invalid (400, 401), clear all tokens
+      if (e.response?.statusCode == 400 || e.response?.statusCode == 401) {
+        _logger.w('Refresh token is invalid, clearing all tokens');
+        await _tokenStorage.clearTokens();
+      }
+
       return false;
     } catch (e) {
       _logger.e('Token refresh failed: $e');

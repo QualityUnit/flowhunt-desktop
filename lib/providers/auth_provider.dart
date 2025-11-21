@@ -81,3 +81,20 @@ final authStateProvider = FutureProvider<bool>((ref) async {
   final authService = ref.read(authServiceProvider);
   return await authService.isAuthenticated();
 });
+
+// Auth Error Notifier - to trigger navigation to login on auth failures
+class AuthErrorNotifier extends StateNotifier<bool> {
+  AuthErrorNotifier() : super(false);
+
+  void triggerAuthError() {
+    state = true;
+    // Reset after triggering
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) state = false;
+    });
+  }
+}
+
+final authErrorProvider = StateNotifierProvider<AuthErrorNotifier, bool>((ref) {
+  return AuthErrorNotifier();
+});

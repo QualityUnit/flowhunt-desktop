@@ -79,15 +79,32 @@ flutter test integration_test/
 
 ## Building for Production
 
-### Windows:
+We provide a comprehensive build script that creates professional installers for all platforms.
+
+### Quick Build
+
 ```bash
-flutter build windows --release
+# Make executable (first time only)
+chmod +x build.sh
+
+# Build for your platform
+./build.sh macos     # Creates DMG installer
+./build.sh windows   # Creates ZIP package
+./build.sh linux     # Creates TAR.GZ package
 ```
 
-### macOS:
-```bash
-flutter build macos --release
-```
+**Output:** Installers are placed in the `dist/` directory.
+
+### Complete Build Guide
+
+For detailed instructions including:
+- Manual builds
+- Code signing
+- Creating AppImage/DEB packages
+- CI/CD with GitHub Actions
+- Troubleshooting
+
+See **[BUILD-GUIDE.md](BUILD-GUIDE.md)** for the complete documentation.
 
 ## Configuration
 

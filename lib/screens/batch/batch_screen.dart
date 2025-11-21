@@ -41,6 +41,13 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   bool _isDragging = false; // Track drag over state
   String? _currentSessionId; // Current session ID for withSession mode
 
+  // Sorting state
+  String _sortColumn = 'row'; // row, status, credits, input, filename
+  bool _sortAscending = true;
+
+  // Filtering state
+  Set<String> _statusFilter = {}; // Empty = show all
+
   @override
   void initState() {
     super.initState();
@@ -1121,6 +1128,45 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                   _buildStatusChip('Done', _getTaskCountByStatus('done'), Colors.green),
                   _buildStatusChip('Skipped', _getTaskCountByStatus('skipped'), Colors.orange),
                   _buildStatusChip('Failed', _getTaskCountByStatus('failed'), Colors.red),
+                  if (_statusFilter.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _statusFilter.clear();
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.clear,
+                              size: 12,
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Clear Filters',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   if (_isExecuting) ...[
                     const SizedBox(width: 8),
                     Container(
@@ -1180,41 +1226,30 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                 ),
                 child: Row(
                   children: [
-                    SizedBox(
+                    _buildSortableColumnHeader(
+                      label: '#',
+                      column: 'row',
+                      theme: theme,
                       width: 50,
-                      child: Text(
-                        '#',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
                     ),
-                    Expanded(
+                    _buildSortableColumnHeader(
+                      label: 'Input Value',
+                      column: 'input',
+                      theme: theme,
                       flex: 4,
-                      child: Text(
-                        'Input Value',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
                     ),
                     if (_writeOutputToFile)
-                      Expanded(
+                      _buildSortableColumnHeader(
+                        label: 'Filename',
+                        column: 'filename',
+                        theme: theme,
                         flex: 2,
-                        child: Text(
-                          'Filename',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                       ),
-                    Expanded(
-                      child: Text(
-                        'Status',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    _buildSortableColumnHeader(
+                      label: 'Status',
+                      column: 'status',
+                      theme: theme,
+                      flex: 1,
                     ),
                     Expanded(
                       flex: 2,
@@ -1225,13 +1260,11 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                         ),
                       ),
                     ),
-                    Expanded(
-                      child: Text(
-                        'Credits',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    _buildSortableColumnHeader(
+                      label: 'Credits',
+                      column: 'credits',
+                      theme: theme,
+                      flex: 1,
                     ),
                     Expanded(
                       child: Text(
@@ -1247,11 +1280,15 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
               // Table rows
               SizedBox(
                 height: 400,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _tasks.length,
-                  itemBuilder: (context, index) {
-                    final task = _tasks[index];
+                child: Builder(
+                  builder: (context) {
+                    final sortedTasks = _getSortedTasks();
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: sortedTasks.length,
+                      itemBuilder: (context, index) {
+                        final task = sortedTasks[index];
+                        final originalIndex = _tasks.indexOf(task);
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
@@ -1267,7 +1304,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                           SizedBox(
                             width: 50,
                             child: Text(
-                              '${index + 1}',
+                              '${originalIndex + 1}',
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                               ),
@@ -1276,7 +1313,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                           Expanded(
                             flex: 4,
                             child: InkWell(
-                              onTap: () => _editTaskInput(index),
+                              onTap: () => _editTaskInput(originalIndex),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 4),
                                 child: Text(
@@ -1292,7 +1329,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                             Expanded(
                               flex: 2,
                               child: InkWell(
-                                onTap: () => _editTaskFilename(index),
+                                onTap: () => _editTaskFilename(originalIndex),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 4),
                                   child: Text(
@@ -1423,6 +1460,8 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                         ],
                       ),
                     );
+                      },
+                    );
                   },
                 ),
               ),
@@ -1434,23 +1473,53 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   }
 
   Widget _buildStatusChip(String label, int count, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
+    final statusKey = label.toLowerCase();
+    final isActive = _statusFilter.contains(statusKey);
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (isActive) {
+            _statusFilter.remove(statusKey);
+          } else {
+            _statusFilter.add(statusKey);
+          }
+        });
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive ? color.withValues(alpha: 0.2) : null,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isActive ? color : Colors.transparent,
+            width: 1.5,
           ),
         ),
-        const SizedBox(width: 4),
-        Text(
-          '$label: $count',
-          style: TextStyle(fontSize: 12, color: color),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$label: $count',
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -1516,6 +1585,120 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   bool _canWriteToFiles() {
     return _writeOutputToFile &&
            _tasks.any((task) => task.status == 'done' && task.result != null);
+  }
+
+  void _sortTasks(String column) {
+    setState(() {
+      if (_sortColumn == column) {
+        // Toggle sort direction if same column
+        _sortAscending = !_sortAscending;
+      } else {
+        // New column, default to ascending
+        _sortColumn = column;
+        _sortAscending = true;
+      }
+    });
+  }
+
+  List<BatchTask> _getSortedTasks() {
+    // First filter
+    var tasks = _statusFilter.isEmpty
+        ? List<BatchTask>.from(_tasks)
+        : _tasks.where((task) => _statusFilter.contains(task.status)).toList();
+
+    tasks.sort((a, b) {
+      int comparison = 0;
+
+      switch (_sortColumn) {
+        case 'row':
+          // Sort by original index
+          comparison = _tasks.indexOf(a).compareTo(_tasks.indexOf(b));
+          break;
+        case 'status':
+          // Status priority: queued > waiting > pending > done > failed > skipped
+          final statusOrder = {
+            'queued': 0,
+            'waiting': 1,
+            'pending': 2,
+            'done': 3,
+            'failed': 4,
+            'skipped': 5,
+          };
+          final aOrder = statusOrder[a.status] ?? 99;
+          final bOrder = statusOrder[b.status] ?? 99;
+          comparison = aOrder.compareTo(bOrder);
+          break;
+        case 'credits':
+          final aCredits = a.credits ?? 0;
+          final bCredits = b.credits ?? 0;
+          comparison = aCredits.compareTo(bCredits);
+          break;
+        case 'input':
+          final aInput = a.flowInput['input']?.toString() ?? '';
+          final bInput = b.flowInput['input']?.toString() ?? '';
+          comparison = aInput.compareTo(bInput);
+          break;
+        case 'filename':
+          final aFilename = a.filename ?? '';
+          final bFilename = b.filename ?? '';
+          comparison = aFilename.compareTo(bFilename);
+          break;
+      }
+
+      return _sortAscending ? comparison : -comparison;
+    });
+
+    return tasks;
+  }
+
+  Widget _buildSortableColumnHeader({
+    required String label,
+    required String column,
+    required ThemeData theme,
+    int flex = 1,
+    double? width,
+  }) {
+    final isActive = _sortColumn == column;
+    final child = InkWell(
+      onTap: () => _sortTasks(column),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isActive
+                      ? theme.colorScheme.primary
+                      : theme.textTheme.titleSmall?.color,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              isActive
+                  ? (_sortAscending
+                      ? Icons.arrow_upward
+                      : Icons.arrow_downward)
+                  : Icons.unfold_more,
+              size: 16,
+              color: isActive
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (width != null) {
+      return SizedBox(width: width, child: child);
+    } else {
+      return Expanded(flex: flex, child: child);
+    }
   }
 
   Future<void> _retryTask(BatchTask task) async {
@@ -1598,6 +1781,12 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     _logger.i('Stopping single task ${task.id}');
     setState(() {
       task.shouldCancel = true;
+      // Mark task as failed immediately for better UI feedback
+      if (task.status == 'queued') {
+        task.status = 'failed';
+        task.endTime = DateTime.now();
+        task.error = 'Task cancelled by user';
+      }
     });
   }
 
@@ -2345,6 +2534,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       if (task == null || task.shouldCancel) {
         // Task was removed or cancelled
+        if (task != null && task.shouldCancel) {
+          _logger.i('Task ${task.id} cancelled, removing from running tasks');
+        }
         runningTasks.remove(taskIdToCheck);
         runningTaskIds.remove(taskIdToCheck);
         pollAttempts.remove(taskIdToCheck);

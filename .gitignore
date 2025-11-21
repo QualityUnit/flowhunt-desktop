@@ -228,3 +228,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Distribution artifacts (from build script)
+/dist/
+*.dmg
+*.zip
+*.tar.gz
+*.deb
+*.rpm
+*.AppImage
