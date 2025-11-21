@@ -2,12 +2,14 @@ class BatchTask {
   final String id;
   final Map<String, dynamic> flowInput;
   final String? filename;
-  String status; // pending, running, completed, failed
+  String status; // pending, waiting, queued, done, failed, skipped
   String? result;
   String? error;
   double? credits; // Credits used (from API result)
   String? rawOutput; // Raw API response for debugging
   String? taskId; // API task ID from flow execution
+  String? sessionId; // Session ID for withSession mode
+  Set<String> processedEventIds = {}; // Track processed event IDs to avoid duplicates
   DateTime? startTime;
   DateTime? endTime;
   bool shouldCancel = false; // Flag to signal task cancellation

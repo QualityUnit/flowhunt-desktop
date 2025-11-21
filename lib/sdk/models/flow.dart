@@ -45,6 +45,9 @@ class FlowResponse {
   @JsonKey(name: 'last_modified')
   final String? lastModified;
 
+  @JsonKey(name: 'chatbot_id')
+  final String? chatbotId;
+
   FlowResponse({
     this.flowId,
     this.name,
@@ -55,6 +58,7 @@ class FlowResponse {
     this.executedAt,
     this.enableCache,
     this.lastModified,
+    this.chatbotId,
   });
 
   factory FlowResponse.fromJson(Map<String, dynamic> json) =>
@@ -236,4 +240,134 @@ class TaskResponse {
       return null;
     }
   }
+}
+
+// Flow Session Models
+@JsonSerializable()
+class FlowSessionResponse {
+  @JsonKey(name: 'session_id')
+  final String? sessionId;
+
+  @JsonKey(name: 'flow_id')
+  final String? flowId;
+
+  @JsonKey(name: 'created_at')
+  final String? createdAt;
+
+  final String? status;
+
+  FlowSessionResponse({
+    this.sessionId,
+    this.flowId,
+    this.createdAt,
+    this.status,
+  });
+
+  factory FlowSessionResponse.fromJson(Map<String, dynamic> json) =>
+      _$FlowSessionResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$FlowSessionResponseToJson(this);
+}
+
+@JsonSerializable()
+class SessionInvokeResponse {
+  @JsonKey(name: 'session_id')
+  final String? sessionId;
+
+  final String? status;
+
+  @JsonKey(name: 'message_id')
+  final String? messageId;
+
+  SessionInvokeResponse({
+    this.sessionId,
+    this.status,
+    this.messageId,
+  });
+
+  factory SessionInvokeResponse.fromJson(Map<String, dynamic> json) =>
+      _$SessionInvokeResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SessionInvokeResponseToJson(this);
+}
+
+@JsonSerializable()
+class SessionMessage {
+  @JsonKey(name: 'event_id')
+  final String? eventId;
+
+  @JsonKey(name: 'event_type')
+  final String? eventType;
+
+  @JsonKey(name: 'created_at_timestamp', fromJson: _timestampFromJson)
+  final int? createdAtTimestamp;
+
+  @JsonKey(name: 'action_type')
+  final String? actionType;
+
+  final double? credits;
+
+  final dynamic metadata;
+
+  @JsonKey(name: 'component_name')
+  final String? componentName;
+
+  @JsonKey(name: 'workspace_id')
+  final String? workspaceId;
+
+  @JsonKey(name: 'session_id')
+  final String? sessionId;
+
+  SessionMessage({
+    this.eventId,
+    this.eventType,
+    this.createdAtTimestamp,
+    this.actionType,
+    this.credits,
+    this.metadata,
+    this.componentName,
+    this.workspaceId,
+    this.sessionId,
+  });
+
+  // Custom converter to handle both String and int for timestamp
+  static int? _timestampFromJson(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) {
+      return int.tryParse(value);
+    }
+    if (value is num) return value.toInt();
+    return null;
+  }
+
+  factory SessionMessage.fromJson(Map<String, dynamic> json) =>
+      _$SessionMessageFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SessionMessageToJson(this);
+
+  // Helper to get timestamp for polling
+  String? get timestamp => createdAtTimestamp?.toString();
+}
+
+@JsonSerializable()
+class SessionInvocationResponse {
+  final List<SessionMessage>? messages;
+
+  @JsonKey(name: 'has_more')
+  final bool? hasMore;
+
+  @JsonKey(name: 'last_timestamp')
+  final int? lastTimestamp;
+
+  SessionInvocationResponse({
+    this.messages,
+    this.hasMore,
+    this.lastTimestamp,
+  });
+
+  factory SessionInvocationResponse.fromJson(Map<String, dynamic> json) =>
+      _$SessionInvocationResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SessionInvocationResponseToJson(this);
 }

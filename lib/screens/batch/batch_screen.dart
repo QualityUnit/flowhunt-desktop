@@ -14,6 +14,12 @@ import '../../sdk/models/batch_task.dart';
 import '../../providers/workspace_provider.dart';
 import '../../providers/flow_provider.dart';
 
+enum ExecutionMode {
+  singleton,
+  normal,
+  withSession,
+}
+
 class BatchScreen extends ConsumerStatefulWidget {
   const BatchScreen({super.key});
 
@@ -28,10 +34,12 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   final List<BatchTask> _tasks = [];
   int _parallelExecutions = 5;
   bool _isExecuting = false;
-  bool _useSingleton = true; // Singleton mode is default
+  ExecutionMode _executionMode = ExecutionMode.normal; // Normal mode is default
   bool _writeOutputToFile = true; // Write output to file option (enabled by default)
+  bool _overwriteExistingFiles = false; // Overwrite existing files option (disabled by default)
   String _outputDirectory = Directory.current.path; // Default to current directory
   bool _isDragging = false; // Track drag over state
+  String? _currentSessionId; // Current session ID for withSession mode
 
   @override
   void initState() {
@@ -462,23 +470,27 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                       ),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: DropdownButton<bool>(
-                      value: _useSingleton,
+                    child: DropdownButton<ExecutionMode>(
+                      value: _executionMode,
                       underline: const SizedBox(),
                       isDense: true,
                       items: const [
                         DropdownMenuItem(
-                          value: true,
-                          child: Text('Single Execution'),
+                          value: ExecutionMode.singleton,
+                          child: Text('Singleton'),
                         ),
                         DropdownMenuItem(
-                          value: false,
+                          value: ExecutionMode.normal,
                           child: Text('Normal'),
+                        ),
+                        DropdownMenuItem(
+                          value: ExecutionMode.withSession,
+                          child: Text('With Session'),
                         ),
                       ],
                       onChanged: (value) {
                         if (value != null) {
-                          setState(() => _useSingleton = value);
+                          setState(() => _executionMode = value);
                         }
                       },
                     ),
@@ -489,7 +501,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: _useSingleton
+                  color: _executionMode != ExecutionMode.normal
                       ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
                       : theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(6),
@@ -500,18 +512,26 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                     Row(
                       children: [
                         Icon(
-                          _useSingleton ? Icons.check_circle : Icons.info_outline,
+                          _executionMode == ExecutionMode.singleton
+                              ? Icons.check_circle
+                              : _executionMode == ExecutionMode.withSession
+                                  ? Icons.chat_bubble_outline
+                                  : Icons.info_outline,
                           size: 16,
-                          color: _useSingleton
+                          color: _executionMode != ExecutionMode.normal
                               ? theme.colorScheme.primary
                               : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          _useSingleton ? 'Singleton Mode' : 'Normal Mode',
+                          _executionMode == ExecutionMode.singleton
+                              ? 'Singleton Mode'
+                              : _executionMode == ExecutionMode.withSession
+                                  ? 'Session Mode'
+                                  : 'Normal Mode',
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: _useSingleton
+                            color: _executionMode != ExecutionMode.normal
                                 ? theme.colorScheme.primary
                                 : theme.colorScheme.onSurface,
                           ),
@@ -520,9 +540,11 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _useSingleton
+                      _executionMode == ExecutionMode.singleton
                           ? 'Each task is executed only once for the given input. If the same input is queued multiple times, it will be executed only once.'
-                          : 'Each task is executed independently. The same input can be executed multiple times in parallel.',
+                          : _executionMode == ExecutionMode.withSession
+                              ? 'Each task creates a new flow session. Results can come from cached values, and all messages are stored.'
+                              : 'Each task is executed independently. The same input can be executed multiple times in parallel.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                         fontSize: 12,
@@ -719,6 +741,67 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                               ),
                             ],
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Overwrite existing files option
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.refresh,
+                            size: 16,
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Overwrite existing files',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ),
+                          Switch(
+                            value: _overwriteExistingFiles,
+                            onChanged: (value) {
+                              setState(() => _overwriteExistingFiles = value);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _overwriteExistingFiles
+                              ? theme.colorScheme.errorContainer.withValues(alpha: 0.2)
+                              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              _overwriteExistingFiles ? Icons.warning_amber : Icons.info_outline,
+                              size: 14,
+                              color: _overwriteExistingFiles
+                                  ? theme.colorScheme.error
+                                  : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _overwriteExistingFiles
+                                    ? 'Existing files will be overwritten. Tasks with existing files will be re-executed.'
+                                    : 'Tasks with existing output files will be skipped and marked as "skipped" to avoid duplicate work.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -1022,7 +1105,40 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                   _buildStatusChip('Waiting', _getTaskCountByStatus('waiting'), Colors.grey),
                   _buildStatusChip('Queued', _getTaskCountByStatus('queued'), Colors.blue),
                   _buildStatusChip('Done', _getTaskCountByStatus('done'), Colors.green),
+                  _buildStatusChip('Skipped', _getTaskCountByStatus('skipped'), Colors.orange),
                   _buildStatusChip('Failed', _getTaskCountByStatus('failed'), Colors.red),
+                  if (_isExecuting) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.sync_outlined,
+                            size: 12,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Max: $_parallelExecutions',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1338,6 +1454,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       case 'done':
         dotColor = Colors.green;
         break;
+      case 'skipped':
+        dotColor = Colors.orange;
+        break;
       case 'failed':
         dotColor = Colors.red;
         break;
@@ -1386,15 +1505,32 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
     final flowService = ref.read(flowServiceProvider);
 
-    // Reset task status
+    // Temporarily set _isExecuting to allow task execution
+    final wasExecuting = _isExecuting;
     setState(() {
+      _isExecuting = true;
+      // Reset task status
       task.status = 'waiting';
       task.result = null;
       task.error = null;
+      task.startTime = null;
+      task.endTime = null;
+      task.taskId = null;
+      task.sessionId = null;
+      task.processedEventIds.clear();
     });
 
-    // Execute the task
-    await _executeTask(task, flowService, workspaceId);
+    try {
+      // Execute the task
+      await _executeTask(task, flowService, workspaceId);
+    } finally {
+      // Restore previous execution state
+      if (!wasExecuting) {
+        setState(() {
+          _isExecuting = false;
+        });
+      }
+    }
   }
 
   Future<void> _startSingleTask(BatchTask task) async {
@@ -2041,12 +2177,12 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     }
 
     // Initialize only pending/failed tasks to 'waiting' status
-    // Skip tasks that are already 'done' or 'failed' to avoid re-execution
+    // Skip tasks that are already 'done' to avoid re-execution (Resume functionality)
     setState(() {
       _isExecuting = true;
       for (var task in _tasks) {
-        // Only reset tasks that are not already completed
-        if (task.status != 'done' && task.status != 'failed') {
+        // Only reset tasks that are not already completed successfully
+        if (task.status != 'done') {
           task.status = 'waiting';
           task.result = null;
           task.error = null;
@@ -2054,10 +2190,17 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       }
     });
 
-    _logger.i('Starting batch execution');
+    final tasksToExecute = _tasks.where((task) => task.status != 'done' && task.status != 'skipped').length;
+    final tasksAlreadyDone = _tasks.where((task) => task.status == 'done').length;
+    final tasksSkipped = _tasks.where((task) => task.status == 'skipped').length;
+
+    _logger.i('Starting batch execution (Resume mode)');
     _logger.i('Flow: ${_selectedFlow!.name} (${_selectedFlow!.flowId})');
-    _logger.i('Tasks: ${_tasks.length}');
-    _logger.i('Execution mode: ${_useSingleton ? "Singleton" : "Normal"}');
+    _logger.i('Total tasks: ${_tasks.length}');
+    _logger.i('Tasks to execute: $tasksToExecute');
+    _logger.i('Tasks already done: $tasksAlreadyDone');
+    _logger.i('Tasks skipped: $tasksSkipped');
+    _logger.i('Execution mode: ${_executionMode.name}');
     _logger.i('Parallel executions: $_parallelExecutions');
 
     // Execute tasks in parallel batches
@@ -2074,19 +2217,243 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     }
 
     final flowService = ref.read(flowServiceProvider);
-    int currentIndex = 0;
 
-    while (currentIndex < _tasks.length && _isExecuting) {
-      // Get next batch of tasks
-      final batchEnd = (currentIndex + _parallelExecutions).clamp(0, _tasks.length);
-      final batch = _tasks.sublist(currentIndex, batchEnd);
+    // Filter out tasks that are already done or skipped (Resume functionality)
+    final tasksToExecute = _tasks.where((task) => task.status != 'done' && task.status != 'skipped').toList();
 
-      // Execute batch in parallel
-      await Future.wait(
-        batch.map((task) => _executeTask(task, flowService, workspaceId)),
-      );
+    if (tasksToExecute.isEmpty) {
+      _logger.i('All tasks already completed, nothing to execute');
+      setState(() => _isExecuting = false);
+      return;
+    }
 
-      currentIndex = batchEnd;
+    _logger.i('Starting task queue execution with ${tasksToExecute.length} tasks, max concurrent: $_parallelExecutions');
+
+    // Task queue management
+    final taskQueue = List<BatchTask>.from(tasksToExecute);
+    final Map<String, BatchTask> runningTasks = {}; // taskId -> BatchTask
+    final Map<String, int> pollAttempts = {}; // taskId -> attempt count
+    int queueIndex = 0;
+
+    // Helper function to start a task and add it to running tasks
+    // Returns true if task was actually scheduled (not skipped)
+    Future<bool> scheduleTask(BatchTask task) async {
+      final taskId = await _startTask(task, flowService, workspaceId);
+      if (taskId != null && _isExecuting) {
+        runningTasks[taskId] = task;
+        pollAttempts[taskId] = 0;
+        _logger.d('Scheduled task ${task.id} with taskId: $taskId');
+        return true;
+      }
+      return false; // Task was skipped or failed to start
+    }
+
+    // Start initial batch of tasks IN PARALLEL
+    // Keep starting tasks until we have _parallelExecutions actually running
+    while (runningTasks.length < _parallelExecutions && queueIndex < taskQueue.length && _isExecuting) {
+      final batchSize = _parallelExecutions - runningTasks.length;
+      final batchEnd = (queueIndex + batchSize).clamp(0, taskQueue.length);
+      final batch = taskQueue.sublist(queueIndex, batchEnd);
+
+      // Start batch in parallel
+      final futures = batch.map((task) => scheduleTask(task)).toList();
+      await Future.wait(futures);
+
+      queueIndex = batchEnd;
+      _logger.d('After batch: ${runningTasks.length} running, queueIndex: $queueIndex');
+    }
+
+    _logger.i('Scheduled ${runningTasks.length} initial tasks in parallel (may have skipped some)');
+
+    // Round-robin polling loop
+    const pollInterval = Duration(seconds: 2);
+    const maxAttempts = 1800; // 60 minutes max (1800 * 2 seconds)
+    final runningTaskIds = runningTasks.keys.toList();
+    int currentPollIndex = 0;
+
+    while (runningTasks.isNotEmpty && _isExecuting) {
+      await Future.delayed(pollInterval);
+
+      if (runningTaskIds.isEmpty) break;
+
+      // Dynamic adjustment: start tasks to fill up to parallel limit
+      // We need to account for skipped tasks, so start more than we need
+      if (runningTasks.length < _parallelExecutions && queueIndex < taskQueue.length && _isExecuting) {
+        final slotsToFill = _parallelExecutions - runningTasks.length;
+        // Try to start extra tasks to account for potential skips (2x)
+        final tasksToTry = (slotsToFill * 2).clamp(0, taskQueue.length - queueIndex);
+        _logger.d('Parallel limit is $_parallelExecutions, currently ${runningTasks.length} running, trying to start $tasksToTry tasks');
+
+        // Start additional tasks in parallel (some may be skipped)
+        final batchEnd = (queueIndex + tasksToTry).clamp(0, taskQueue.length);
+        final batch = taskQueue.sublist(queueIndex, batchEnd);
+
+        // Fire off all in parallel without awaiting
+        for (final task in batch) {
+          scheduleTask(task).then((scheduled) {
+            if (scheduled) {
+              final taskId = task.taskId;
+              if (taskId != null && !runningTaskIds.contains(taskId)) {
+                runningTaskIds.add(taskId);
+                _logger.i('Started task ${task.id} (${runningTasks.length}/$_parallelExecutions running)');
+              }
+            }
+          });
+        }
+
+        queueIndex = batchEnd;
+      } else if (runningTasks.length > _parallelExecutions) {
+        // User decreased the parallel limit - log it but don't kill running tasks
+        _logger.d('Parallel limit decreased to $_parallelExecutions (${runningTasks.length} tasks still running, will not start new tasks until count drops)');
+      }
+
+      // Round-robin: check one task at a time
+      final taskIdToCheck = runningTaskIds[currentPollIndex % runningTaskIds.length];
+      final task = runningTasks[taskIdToCheck];
+
+      if (task == null || task.shouldCancel) {
+        // Task was removed or cancelled
+        runningTasks.remove(taskIdToCheck);
+        runningTaskIds.remove(taskIdToCheck);
+        pollAttempts.remove(taskIdToCheck);
+
+        // Start next tasks from queue to fill available slots
+        // Try multiple tasks to account for potential skips
+        if (runningTasks.length < _parallelExecutions && queueIndex < taskQueue.length) {
+          final slotsAvailable = _parallelExecutions - runningTasks.length;
+          final tasksToTry = (slotsAvailable * 2).clamp(0, taskQueue.length - queueIndex);
+          final batchEnd = (queueIndex + tasksToTry).clamp(0, taskQueue.length);
+
+          for (int i = queueIndex; i < batchEnd; i++) {
+            final nextTask = taskQueue[i];
+            scheduleTask(nextTask).then((scheduled) {
+              if (scheduled && nextTask.taskId != null && !runningTaskIds.contains(nextTask.taskId!)) {
+                runningTaskIds.add(nextTask.taskId!);
+              }
+            });
+          }
+          queueIndex = batchEnd;
+        }
+        continue;
+      }
+
+      pollAttempts[taskIdToCheck] = (pollAttempts[taskIdToCheck] ?? 0) + 1;
+      final attempts = pollAttempts[taskIdToCheck]!;
+
+      // Check if task timed out
+      if (attempts >= maxAttempts) {
+        _logger.e('Task ${task.id} timed out after $attempts attempts');
+        setState(() {
+          task.status = 'failed';
+          task.endTime = DateTime.now();
+          task.error = 'Task timed out after ${maxAttempts * 2} seconds';
+        });
+        runningTasks.remove(taskIdToCheck);
+        runningTaskIds.remove(taskIdToCheck);
+        pollAttempts.remove(taskIdToCheck);
+
+        // Start next tasks from queue to fill available slots
+        // Try multiple tasks to account for potential skips
+        if (runningTasks.length < _parallelExecutions && queueIndex < taskQueue.length) {
+          final slotsAvailable = _parallelExecutions - runningTasks.length;
+          final tasksToTry = (slotsAvailable * 2).clamp(0, taskQueue.length - queueIndex);
+          final batchEnd = (queueIndex + tasksToTry).clamp(0, taskQueue.length);
+
+          for (int i = queueIndex; i < batchEnd; i++) {
+            final nextTask = taskQueue[i];
+            scheduleTask(nextTask).then((scheduled) {
+              if (scheduled && nextTask.taskId != null && !runningTaskIds.contains(nextTask.taskId!)) {
+                runningTaskIds.add(nextTask.taskId!);
+              }
+            });
+          }
+          queueIndex = batchEnd;
+        }
+        continue;
+      }
+
+      // Poll task status
+      try {
+        if (attempts == 1 || attempts % 10 == 0) {
+          _logger.i('Polling task ${task.id} (attempt $attempts)');
+        }
+
+        final statusResponse = await flowService.checkTaskStatus(
+          flowId: _selectedFlow!.flowId!,
+          taskId: taskIdToCheck,
+          workspaceId: workspaceId,
+        );
+
+        _logger.d('Task ${task.id} status: ${statusResponse.status}');
+
+        if (statusResponse.status == 'SUCCESS') {
+          setState(() {
+            task.status = 'done';
+            task.endTime = DateTime.now();
+            task.result = statusResponse.aiAnswer ??
+                         statusResponse.errorMessage ??
+                         'Task $taskIdToCheck - ${statusResponse.status}';
+            task.credits = statusResponse.credits;
+            task.rawOutput = jsonEncode(statusResponse.toJson());
+          });
+          _logger.i('Task ${task.id} completed after $attempts polls');
+
+          // Automatically write output to file if enabled
+          await _writeTaskOutputToFile(task);
+
+          // Remove from running tasks
+          runningTasks.remove(taskIdToCheck);
+          runningTaskIds.remove(taskIdToCheck);
+          pollAttempts.remove(taskIdToCheck);
+
+          // Start next task from queue only if we're under the parallel limit
+          if (queueIndex < taskQueue.length && _isExecuting && runningTasks.length < _parallelExecutions) {
+            final nextTask = taskQueue[queueIndex];
+            final nextTaskId = await _startTask(nextTask, flowService, workspaceId);
+            if (nextTaskId != null) {
+              runningTasks[nextTaskId] = nextTask;
+              runningTaskIds.add(nextTaskId);
+              pollAttempts[nextTaskId] = 0;
+            }
+            queueIndex++;
+          }
+        } else if (statusResponse.status == 'FAILED' || statusResponse.status == 'ERROR') {
+          setState(() {
+            task.status = 'failed';
+            task.endTime = DateTime.now();
+            task.error = statusResponse.errorMessage ?? 'Task failed: ${statusResponse.status}';
+            task.rawOutput = jsonEncode(statusResponse.toJson());
+          });
+          _logger.e('Task ${task.id} failed after $attempts polls');
+
+          // Remove from running tasks
+          runningTasks.remove(taskIdToCheck);
+          runningTaskIds.remove(taskIdToCheck);
+          pollAttempts.remove(taskIdToCheck);
+
+          // Start next task from queue only if we're under the parallel limit
+          if (queueIndex < taskQueue.length && _isExecuting && runningTasks.length < _parallelExecutions) {
+            final nextTask = taskQueue[queueIndex];
+            final nextTaskId = await _startTask(nextTask, flowService, workspaceId);
+            if (nextTaskId != null) {
+              runningTasks[nextTaskId] = nextTask;
+              runningTaskIds.add(nextTaskId);
+              pollAttempts[nextTaskId] = 0;
+            }
+            queueIndex++;
+          }
+        } else if (statusResponse.status == 'PENDING') {
+          // Task still pending, continue polling
+          if (mounted) {
+            setState(() {});
+          }
+        }
+      } catch (e, stackTrace) {
+        _logger.e('Error polling task ${task.id}', error: e, stackTrace: stackTrace);
+      }
+
+      // Move to next task in round-robin
+      currentPollIndex++;
     }
 
     if (_isExecuting) {
@@ -2108,12 +2475,140 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     }
   }
 
+  // Helper method to start a task and return its taskId
+  Future<String?> _startTask(BatchTask task, dynamic flowService, String workspaceId) async {
+    try {
+      // Check if file already exists and skip if overwrite is disabled
+      if (_writeOutputToFile && !_overwriteExistingFiles && task.filename != null) {
+        final outputPath = '$_outputDirectory/${task.filename}';
+        final outputFile = File(outputPath);
+
+        if (await outputFile.exists()) {
+          _logger.i('Skipping task ${task.id} - output file already exists: ${task.filename}');
+          setState(() {
+            task.status = 'skipped';
+            task.result = 'File already exists';
+          });
+          return null;
+        }
+      }
+
+      setState(() {
+        task.status = 'queued';
+        task.startTime = DateTime.now();
+      });
+
+      _logger.d('Starting task ${task.id}: ${task.flowInput}');
+
+      // Handle different execution modes
+      if (_executionMode == ExecutionMode.withSession) {
+        // Session mode: create session, invoke, and poll for messages
+        // For now, we'll handle this separately as it has different polling logic
+        await _executeTaskWithSession(task, flowService, workspaceId);
+        return null; // Session tasks are self-contained
+      }
+
+      // Convert 'input' to 'human_input' for API compatibility
+      final apiFlowInput = {
+        'human_input': task.flowInput['input'],
+      };
+
+      // Invoke the flow - this returns immediately with task_id and PENDING status
+      final initialResponse = _executionMode == ExecutionMode.singleton
+        ? await flowService.invokeFlowSingleton(
+            flowId: _selectedFlow!.flowId!,
+            workspaceId: workspaceId,
+            flowInput: apiFlowInput,
+            streamResponse: false,
+          )
+        : await flowService.invokeFlow(
+            flowId: _selectedFlow!.flowId!,
+            workspaceId: workspaceId,
+            flowInput: apiFlowInput,
+            streamResponse: false,
+          );
+
+      final taskId = initialResponse.id;
+      if (taskId == null) {
+        throw Exception('No task ID returned from flow invocation');
+      }
+
+      // Store the task ID
+      setState(() {
+        task.taskId = taskId;
+      });
+
+      _logger.i('Task ${task.id} started with ID: $taskId, status: ${initialResponse.status}');
+
+      // If status is already completed (SUCCESS/FAILED) or result is available, handle immediately
+      if (initialResponse.status != 'PENDING' || initialResponse.result != null) {
+        if (initialResponse.status == 'SUCCESS') {
+          setState(() {
+            task.status = 'done';
+            task.endTime = DateTime.now();
+            task.result = initialResponse.aiAnswer ??
+                         initialResponse.errorMessage ??
+                         'Task $taskId - ${initialResponse.status}';
+            task.credits = initialResponse.credits;
+            task.rawOutput = jsonEncode(initialResponse.toJson());
+          });
+          _logger.i('Task ${task.id} completed immediately');
+
+          // Automatically write output to file if enabled
+          await _writeTaskOutputToFile(task);
+
+          return null; // Task already completed, no need to poll
+        } else if (initialResponse.status == 'FAILED' || initialResponse.status == 'ERROR') {
+          setState(() {
+            task.status = 'failed';
+            task.endTime = DateTime.now();
+            task.error = initialResponse.errorMessage ?? 'Task failed: ${initialResponse.status}';
+            task.rawOutput = jsonEncode(initialResponse.toJson());
+          });
+          _logger.e('Task ${task.id} failed immediately');
+          return null; // Task already failed, no need to poll
+        }
+      }
+
+      return taskId; // Return taskId for polling
+    } catch (e, stackTrace) {
+      _logger.e('Failed to start task ${task.id}', error: e, stackTrace: stackTrace);
+      setState(() {
+        task.status = 'failed';
+        task.endTime = DateTime.now();
+        task.error = e.toString();
+      });
+      return null;
+    }
+  }
+
   Future<void> _executeTask(
     BatchTask task,
     dynamic flowService,
     String workspaceId,
   ) async {
     if (!_isExecuting) return;
+
+    // Skip tasks that are already done (Resume functionality)
+    if (task.status == 'done') {
+      _logger.d('Skipping task ${task.id} - already completed');
+      return;
+    }
+
+    // Check if file already exists and skip if overwrite is disabled
+    if (_writeOutputToFile && !_overwriteExistingFiles && task.filename != null) {
+      final outputPath = '$_outputDirectory/${task.filename}';
+      final outputFile = File(outputPath);
+
+      if (await outputFile.exists()) {
+        _logger.i('Skipping task ${task.id} - output file already exists: ${task.filename}');
+        setState(() {
+          task.status = 'skipped';
+          task.result = 'File already exists';
+        });
+        return;
+      }
+    }
 
     try {
       setState(() {
@@ -2123,6 +2618,13 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       _logger.d('Executing task ${task.id}: ${task.flowInput}');
 
+      // Handle different execution modes
+      if (_executionMode == ExecutionMode.withSession) {
+        // Session mode: create session, invoke, and poll for messages
+        await _executeTaskWithSession(task, flowService, workspaceId);
+        return;
+      }
+
       // Convert 'input' to 'human_input' for API compatibility
       final apiFlowInput = {
         'human_input': task.flowInput['input'],
@@ -2130,7 +2632,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       // Log API call details
       _logger.i('=== API Call Details ===');
-      _logger.i('Execution mode: ${_useSingleton ? "Singleton" : "Normal"}');
+      _logger.i('Execution mode: ${_executionMode.name}');
       _logger.i('Workspace ID: $workspaceId');
       _logger.i('Flow ID: ${_selectedFlow!.flowId}');
       _logger.i('Flow Name: ${_selectedFlow!.name}');
@@ -2138,14 +2640,14 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       _logger.i('Stream Response: false');
 
       // Construct the URL that will be called (for debugging)
-      final endpoint = _useSingleton
+      final endpoint = _executionMode == ExecutionMode.singleton
         ? '/api/v1/flows/${_selectedFlow!.flowId}/invoke-singleton'
         : '/api/v1/flows/${_selectedFlow!.flowId}/invoke';
       _logger.i('API Endpoint: $endpoint');
       _logger.i('=======================');
 
       // Invoke the flow - this returns immediately with task_id and PENDING status
-      final initialResponse = _useSingleton
+      final initialResponse = _executionMode == ExecutionMode.singleton
         ? await flowService.invokeFlowSingleton(
             flowId: _selectedFlow!.flowId!,
             workspaceId: workspaceId,
@@ -2185,6 +2687,10 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
             task.rawOutput = jsonEncode(initialResponse.toJson());
           });
           _logger.i('Task ${task.id} completed immediately: $taskId');
+
+          // Automatically write output to file if enabled
+          await _writeTaskOutputToFile(task);
+
           return;
         } else if (initialResponse.status == 'FAILED' || initialResponse.status == 'ERROR') {
           setState(() {
@@ -2240,6 +2746,10 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
             task.rawOutput = jsonEncode(statusResponse.toJson());
           });
           _logger.i('Task ${task.id} completed after $attempts polls: $taskId');
+
+          // Automatically write output to file if enabled
+          await _writeTaskOutputToFile(task);
+
           return;
         } else if (statusResponse.status == 'FAILED' || statusResponse.status == 'ERROR') {
           setState(() {
@@ -2268,6 +2778,19 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       // Check if cancelled by user
       if (task.shouldCancel) {
+        // Append cancellation info to raw output without replacing result
+        String? currentRawOutput = task.rawOutput;
+        Map<String, dynamic> cancellationInfo = {
+          'cancelled_at': DateTime.now().toIso8601String(),
+          'reason': 'Task cancelled by user',
+        };
+
+        if (currentRawOutput != null && currentRawOutput.isNotEmpty) {
+          task.rawOutput = currentRawOutput + '\n\n--- CANCELLED ---\n' + jsonEncode(cancellationInfo);
+        } else {
+          task.rawOutput = jsonEncode(cancellationInfo);
+        }
+
         setState(() {
           task.status = 'failed';
           task.endTime = DateTime.now();
@@ -2292,6 +2815,205 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     }
   }
 
+  Future<void> _executeTaskWithSession(
+    BatchTask task,
+    dynamic flowService,
+    String workspaceId,
+  ) async {
+    try {
+      final inputMessage = task.flowInput['input']?.toString() ?? '';
+
+      _logger.i('=== EXECUTE TASK WITH SESSION ===');
+      _logger.i('Task ID: ${task.id}');
+      _logger.i('Flow ID: ${_selectedFlow!.flowId}');
+      _logger.i('Input message: $inputMessage');
+
+      // Step 1: Create a new session for this task using from_flow endpoint
+      final sessionResponse = await flowService.createSession(
+        flowId: _selectedFlow!.flowId!,
+        workspaceId: workspaceId,
+      );
+
+      final sessionId = sessionResponse.sessionId;
+      if (sessionId == null) {
+        throw Exception('No session ID returned from session creation');
+      }
+
+      setState(() {
+        task.sessionId = sessionId;
+      });
+
+      _logger.i('Session created: $sessionId');
+
+      // Step 2: Invoke the session with the message
+      await flowService.invokeSession(
+        sessionId: sessionId,
+        workspaceId: workspaceId,
+        message: inputMessage,
+      );
+
+      _logger.i('Session invoked, starting to poll for responses');
+
+      // Step 3: Poll for session responses
+      // Use Unix timestamp (seconds since epoch)
+      int lastTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      const pollInterval = Duration(seconds: 2);
+      const maxAttempts = 1800; // 60 minutes max
+      int attempts = 0;
+      List<Map<String, dynamic>> allMessages = [];
+      bool completed = false;
+
+      while (attempts < maxAttempts && _isExecuting && !task.shouldCancel && !completed) {
+        await Future.delayed(pollInterval);
+        attempts++;
+
+        try {
+          final invocationResponse = await flowService.getSessionResponses(
+            sessionId: sessionId,
+            workspaceId: workspaceId,
+            fromTimestamp: lastTimestamp,
+          );
+
+          // Process messages
+          bool hasNewMessages = false;
+          if (invocationResponse.messages != null) {
+            for (final message in invocationResponse.messages!) {
+              // Check for duplicate event_id
+              if (message.eventId != null && !task.processedEventIds.contains(message.eventId)) {
+                task.processedEventIds.add(message.eventId!);
+                allMessages.add(message.toJson());
+                hasNewMessages = true;
+
+                _logger.d('New message: eventId=${message.eventId}, eventType=${message.eventType}, actionType=${message.actionType}');
+
+                // Check if this is an "ai" event_type - this is the final result
+                if (message.eventType == 'ai') {
+                  completed = true;
+
+                  // Extract result from metadata.message field for ai events
+                  String? result;
+                  double? credits;
+
+                  if (message.metadata != null && message.metadata is Map<String, dynamic>) {
+                    final metadata = message.metadata as Map<String, dynamic>;
+                    if (metadata['message'] != null) {
+                      result = metadata['message'] as String?;
+                    }
+                  }
+
+                  // Extract credits if available (credits are negative, convert to positive and divide)
+                  if (message.credits != null) {
+                    credits = message.credits!.abs() / 1000000.0;
+                  }
+
+                  setState(() {
+                    task.status = 'done';
+                    task.endTime = DateTime.now();
+                    task.result = result ?? 'Session completed';
+                    task.credits = credits;
+                    task.rawOutput = jsonEncode(allMessages);
+                  });
+
+                  _logger.i('Task ${task.id} completed via session with AI response after $attempts polls');
+
+                  // Automatically write output to file if enabled
+                  await _writeTaskOutputToFile(task);
+
+                  return;
+                }
+
+                // Check for error in action_type or event_type
+                if (message.actionType == 'error' || message.eventType == 'error') {
+                  completed = true;
+
+                  String? errorMessage;
+                  if (message.metadata != null && message.metadata is Map<String, dynamic>) {
+                    final metadata = message.metadata as Map<String, dynamic>;
+                    errorMessage = metadata['error_message'] as String? ?? metadata['message'] as String?;
+                  }
+
+                  setState(() {
+                    task.status = 'failed';
+                    task.endTime = DateTime.now();
+                    task.error = errorMessage ?? 'Session failed';
+                    task.rawOutput = jsonEncode(allMessages);
+                  });
+
+                  _logger.e('Task ${task.id} failed via session after $attempts polls');
+                  return;
+                }
+              }
+            }
+          }
+
+          // Update raw output immediately when new messages arrive
+          if (hasNewMessages) {
+            setState(() {
+              task.rawOutput = jsonEncode(allMessages);
+            });
+          }
+
+          // Update last timestamp for next poll (API returns Unix timestamp as int)
+          if (invocationResponse.lastTimestamp != null) {
+            lastTimestamp = invocationResponse.lastTimestamp!;
+          }
+
+          // Update UI to refresh duration
+          if (mounted) {
+            setState(() {});
+          }
+
+        } catch (e) {
+          _logger.e('Error polling session responses: $e');
+          // Continue polling despite errors
+        }
+      }
+
+      // Handle timeout or cancellation
+      if (task.shouldCancel) {
+        // Append cancellation info to the messages without replacing result
+        Map<String, dynamic> cancellationInfo = {
+          'event_type': 'system',
+          'action_type': 'cancelled',
+          'cancelled_at': DateTime.now().toIso8601String(),
+          'reason': 'Task cancelled by user',
+        };
+        allMessages.add(cancellationInfo);
+
+        setState(() {
+          task.status = 'failed';
+          task.endTime = DateTime.now();
+          task.error = 'Task cancelled by user';
+          task.rawOutput = jsonEncode(allMessages);
+        });
+        _logger.w('Task ${task.id} cancelled by user (session)');
+      } else if (attempts >= maxAttempts) {
+        throw Exception('Session task timed out after ${maxAttempts * 2} seconds');
+      } else {
+        // No completion status received but polling stopped
+        setState(() {
+          task.status = 'done';
+          task.endTime = DateTime.now();
+          task.result = 'Session polling completed';
+          task.rawOutput = jsonEncode(allMessages);
+        });
+        _logger.i('Task ${task.id} polling completed (session)');
+
+        // Automatically write output to file if enabled
+        await _writeTaskOutputToFile(task);
+      }
+
+    } catch (e, stackTrace) {
+      _logger.e('Task ${task.id} failed (session)', error: e, stackTrace: stackTrace);
+
+      setState(() {
+        task.status = 'failed';
+        task.endTime = DateTime.now();
+        task.error = e.toString();
+      });
+    }
+  }
+
   void _stopExecution() {
     _logger.i('Stopping batch execution');
     setState(() => _isExecuting = false);
@@ -2300,6 +3022,31 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Execution stopped')),
       );
+    }
+  }
+
+  Future<void> _writeTaskOutputToFile(BatchTask task) async {
+    if (!_writeOutputToFile || _outputDirectory.isEmpty) {
+      return;
+    }
+
+    if (task.filename == null || task.result == null) {
+      return;
+    }
+
+    try {
+      final filePath = '$_outputDirectory/${task.filename}';
+      final file = File(filePath);
+
+      // Create parent directories if they don't exist
+      await file.parent.create(recursive: true);
+
+      // Write the result
+      await file.writeAsString(task.result!);
+
+      _logger.d('Automatically wrote output to: $filePath');
+    } catch (e, stackTrace) {
+      _logger.e('Failed to write output file for task ${task.id}', error: e, stackTrace: stackTrace);
     }
   }
 
