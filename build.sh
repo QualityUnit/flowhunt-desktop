@@ -94,14 +94,27 @@ build_macos() {
     # Create dist directory
     mkdir -p "$DIST_DIR"
 
-    # Path to built app
-    APP_PATH="$BUILD_DIR/macos/Build/Products/Release/flowhunt_desktop.app"
+    # Path to built app (use the actual app name from the build)
+    APP_PATH="$BUILD_DIR/macos/Build/Products/Release/$APP_NAME.app"
     DMG_NAME="FlowHunt-Desktop-$VERSION-macOS.dmg"
     DMG_PATH="$DIST_DIR/$DMG_NAME"
 
     if [ ! -d "$APP_PATH" ]; then
         print_error "Built app not found at $APP_PATH"
-        return 1
+        print_info "Looking for alternative app names..."
+        # Try to find the app with different naming conventions
+        for possible_app in "$BUILD_DIR/macos/Build/Products/Release/"*.app; do
+            if [ -d "$possible_app" ]; then
+                APP_PATH="$possible_app"
+                print_info "Found app at: $APP_PATH"
+                break
+            fi
+        done
+
+        if [ ! -d "$APP_PATH" ]; then
+            print_error "No .app bundle found in Release directory"
+            return 1
+        fi
     fi
 
     # Create temporary directory for DMG
