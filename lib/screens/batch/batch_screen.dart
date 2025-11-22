@@ -2355,11 +2355,22 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         initialValue: task.flowInput['input']?.toString() ?? '',
         onSave: (value) {
           setState(() {
+            // Create new task with updated input but preserve all execution state
             _tasks[index] = BatchTask(
               id: task.id,
               flowInput: {'input': value},
               filename: task.filename,
-            );
+              status: task.status,
+              result: task.result,
+              error: task.error,
+              credits: task.credits,
+              rawOutput: task.rawOutput,
+              taskId: task.taskId,
+              startTime: task.startTime,
+              endTime: task.endTime,
+              shouldCancel: task.shouldCancel,
+            )..sessionId = task.sessionId
+             ..processedEventIds = task.processedEventIds;
           });
         },
       ),
@@ -2377,11 +2388,22 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         initialValue: task.filename ?? '',
         onSave: (value) {
           setState(() {
+            // Create new task with updated filename but preserve all execution state
             _tasks[index] = BatchTask(
               id: task.id,
               flowInput: task.flowInput,
               filename: value.isEmpty ? null : value,
-            );
+              status: task.status,
+              result: task.result,
+              error: task.error,
+              credits: task.credits,
+              rawOutput: task.rawOutput,
+              taskId: task.taskId,
+              startTime: task.startTime,
+              endTime: task.endTime,
+              shouldCancel: task.shouldCancel,
+            )..sessionId = task.sessionId
+             ..processedEventIds = task.processedEventIds;
           });
         },
       ),
