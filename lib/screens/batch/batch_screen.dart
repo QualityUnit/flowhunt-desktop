@@ -20,6 +20,11 @@ enum ExecutionMode {
   withSession,
 }
 
+enum TimeoutPolicy {
+  retry,
+  markAsError,
+}
+
 class BatchScreen extends ConsumerStatefulWidget {
   const BatchScreen({super.key});
 
@@ -40,6 +45,8 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   String _outputDirectory = Directory.current.path; // Default to current directory
   bool _isDragging = false; // Track drag over state
   String? _currentSessionId; // Current session ID for withSession mode
+  int _taskTimeoutSeconds = 3600; // Task timeout in seconds (default: 3600 = 60 minutes)
+  TimeoutPolicy _timeoutPolicy = TimeoutPolicy.markAsError; // Default: mark as error on timeout
 
   // Sorting state
   String _sortColumn = 'row'; // row, status, credits, input, filename
@@ -630,6 +637,194 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Timeout settings
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.timer_outlined,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Timeout Settings',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Task timeout duration
+              Row(
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 16,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Task Timeout:',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: DropdownButton<int>(
+                      value: _taskTimeoutSeconds,
+                      underline: const SizedBox(),
+                      isDense: true,
+                      items: [
+                        const DropdownMenuItem<int>(
+                          value: 300,
+                          child: Text('5 minutes'),
+                        ),
+                        const DropdownMenuItem<int>(
+                          value: 600,
+                          child: Text('10 minutes'),
+                        ),
+                        const DropdownMenuItem<int>(
+                          value: 1800,
+                          child: Text('30 minutes'),
+                        ),
+                        const DropdownMenuItem<int>(
+                          value: 3600,
+                          child: Text('60 minutes'),
+                        ),
+                        const DropdownMenuItem<int>(
+                          value: 7200,
+                          child: Text('120 minutes'),
+                        ),
+                        const DropdownMenuItem<int>(
+                          value: 10800,
+                          child: Text('180 minutes'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _taskTimeoutSeconds = value);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'per task',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Timeout policy
+              Row(
+                children: [
+                  Icon(
+                    Icons.policy_outlined,
+                    size: 16,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Timeout Policy:',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: DropdownButton<TimeoutPolicy>(
+                      value: _timeoutPolicy,
+                      underline: const SizedBox(),
+                      isDense: true,
+                      items: const [
+                        DropdownMenuItem(
+                          value: TimeoutPolicy.markAsError,
+                          child: Text('Mark as Error'),
+                        ),
+                        DropdownMenuItem(
+                          value: TimeoutPolicy.retry,
+                          child: Text('Retry'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _timeoutPolicy = value);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _timeoutPolicy == TimeoutPolicy.retry
+                          ? Icons.refresh
+                          : Icons.error_outline,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _timeoutPolicy == TimeoutPolicy.retry
+                            ? 'Tasks will be automatically retried if they exceed the timeout duration.'
+                            : 'Tasks will be marked as failed if they exceed the timeout duration.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -2507,7 +2702,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
     // Round-robin polling loop
     const pollInterval = Duration(seconds: 2);
-    const maxAttempts = 1800; // 60 minutes max (1800 * 2 seconds)
+    final maxAttempts = (_taskTimeoutSeconds / 2).round(); // Calculate based on timeout setting
     final runningTaskIds = runningTasks.keys.toList();
     int currentPollIndex = 0;
 
@@ -2589,14 +2784,35 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       // Check if task timed out
       if (attempts >= maxAttempts) {
         _logger.e('Task ${task.id} timed out after $attempts attempts');
-        setState(() {
-          task.status = 'failed';
-          task.endTime = DateTime.now();
-          task.error = 'Task timed out after ${maxAttempts * 2} seconds';
-        });
-        runningTasks.remove(taskIdToCheck);
-        runningTaskIds.remove(taskIdToCheck);
-        pollAttempts.remove(taskIdToCheck);
+
+        if (_timeoutPolicy == TimeoutPolicy.retry) {
+          // Retry policy: Reset task and re-queue it
+          _logger.i('Retrying task ${task.id} due to timeout (policy: retry)');
+          setState(() {
+            task.status = 'pending';
+            task.endTime = null;
+            task.startTime = null;
+            task.taskId = null;
+            task.error = null;
+          });
+
+          // Add task back to queue for retry
+          taskQueue.add(task);
+
+          runningTasks.remove(taskIdToCheck);
+          runningTaskIds.remove(taskIdToCheck);
+          pollAttempts.remove(taskIdToCheck);
+        } else {
+          // Mark as error policy: Mark task as failed
+          setState(() {
+            task.status = 'failed';
+            task.endTime = DateTime.now();
+            task.error = 'Task timed out after ${maxAttempts * 2} seconds';
+          });
+          runningTasks.remove(taskIdToCheck);
+          runningTaskIds.remove(taskIdToCheck);
+          pollAttempts.remove(taskIdToCheck);
+        }
 
         // Start next tasks from queue to fill available slots
         // Try multiple tasks to account for potential skips
@@ -3144,7 +3360,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       // Poll for task completion
       _logger.d('Task $taskId is PENDING, starting polling...');
       const pollInterval = Duration(seconds: 2);
-      const maxAttempts = 1800; // 60 minutes max (1800 * 2 seconds)
+      final maxAttempts = (_taskTimeoutSeconds / 2).round(); // Calculate based on timeout setting
       int attempts = 0;
 
       while (attempts < maxAttempts && _isExecuting && !task.shouldCancel) {
@@ -3242,7 +3458,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       // Timeout after max attempts
       if (attempts >= maxAttempts) {
-        throw Exception('Task $taskId timed out after ${maxAttempts * 2} seconds');
+        throw Exception('Task $taskId timed out after $_taskTimeoutSeconds seconds');
       }
     } catch (e, stackTrace) {
       _logger.e('Task ${task.id} failed', error: e, stackTrace: stackTrace);
@@ -3298,7 +3514,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       // Use Unix timestamp (seconds since epoch)
       int lastTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       const pollInterval = Duration(seconds: 2);
-      const maxAttempts = 1800; // 60 minutes max
+      final maxAttempts = (_taskTimeoutSeconds / 2).round(); // Calculate based on timeout setting
       int attempts = 0;
       List<Map<String, dynamic>> allMessages = [];
       bool completed = false;
@@ -3432,7 +3648,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         });
         _logger.w('Task ${task.id} cancelled by user (session)');
       } else if (attempts >= maxAttempts) {
-        throw Exception('Session task timed out after ${maxAttempts * 2} seconds');
+        throw Exception('Session task timed out after $_taskTimeoutSeconds seconds');
       } else {
         // No completion status received but polling stopped
         setState(() {
