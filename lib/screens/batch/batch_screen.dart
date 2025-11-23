@@ -2783,11 +2783,8 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       // Check if task timed out
       if (attempts >= maxAttempts) {
-        _logger.e('Task ${task.id} timed out after $attempts attempts');
-
         if (_timeoutPolicy == TimeoutPolicy.retry) {
           // Retry policy: Reset task and re-queue it
-          _logger.i('Retrying task ${task.id} due to timeout (policy: retry)');
           setState(() {
             task.status = 'pending';
             task.endTime = null;
@@ -2804,6 +2801,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
           pollAttempts.remove(taskIdToCheck);
         } else {
           // Mark as error policy: Mark task as failed
+          _logger.e('Task ${task.id} timed out after $attempts attempts');
           setState(() {
             task.status = 'failed';
             task.endTime = DateTime.now();
