@@ -39,7 +39,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   final List<BatchTask> _tasks = [];
   int _parallelExecutions = 5;
   bool _isExecuting = false;
-  ExecutionMode _executionMode = ExecutionMode.withSession; // With Session mode is default
+  ExecutionMode _executionMode = ExecutionMode.normal; // Normal mode is default
   bool _writeOutputToFile = true; // Write output to file option (enabled by default)
   bool _overwriteExistingFiles = false; // Overwrite existing files option (disabled by default)
   String _outputDirectory = Directory.current.path; // Default to current directory
@@ -54,6 +54,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
   // Filtering state
   Set<String> _statusFilter = {}; // Empty = show all
+
+  // CSV columns state
+  List<String> _csvColumns = []; // Track CSV column names for display
 
   @override
   void initState() {
@@ -1181,19 +1184,24 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                   ),
                   child: Row(
                     children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Flow Input',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (_writeOutputToFile)
-                        Expanded(
+                      // Dynamic CSV column headers
+                      if (_csvColumns.isNotEmpty)
+                        ..._csvColumns.map((columnName) => Expanded(
+                          flex: 2,
                           child: Text(
-                            'Filename',
+                            columnName,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ))
+                      else
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Flow Input',
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -1222,29 +1230,32 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                         ),
                         child: Row(
                           children: [
-                            Expanded(
-                              flex: 2,
-                              child: InkWell(
-                                onTap: () => _editTaskInput(index),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  child: Text(
-                                    task.flowInput['input']?.toString() ?? '',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (_writeOutputToFile)
-                              Expanded(
+                            // Dynamic CSV column values
+                            if (_csvColumns.isNotEmpty)
+                              ..._csvColumns.map((columnName) => Expanded(
+                                flex: 2,
                                 child: InkWell(
-                                  onTap: () => _editTaskFilename(index),
+                                  onTap: () => _editTaskColumnValue(index, columnName),
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 8),
                                     child: Text(
-                                      task.filename ?? '-',
-                                      maxLines: 1,
+                                      task.rowData[columnName] ?? '-',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ))
+                            else
+                              Expanded(
+                                flex: 2,
+                                child: InkWell(
+                                  onTap: () => _editTaskInput(index),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    child: Text(
+                                      task.flowInput['input']?.toString() ?? '',
+                                      maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -1427,18 +1438,25 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                       theme: theme,
                       width: 50,
                     ),
-                    _buildSortableColumnHeader(
-                      label: 'Input Value',
-                      column: 'input',
-                      theme: theme,
-                      flex: 4,
-                    ),
-                    if (_writeOutputToFile)
-                      _buildSortableColumnHeader(
-                        label: 'Filename',
-                        column: 'filename',
-                        theme: theme,
+                    // Dynamic CSV column headers
+                    if (_csvColumns.isNotEmpty)
+                      ..._csvColumns.map((columnName) => Expanded(
                         flex: 2,
+                        child: Text(
+                          columnName,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ))
+                    else
+                      _buildSortableColumnHeader(
+                        label: 'Input Value',
+                        column: 'input',
+                        theme: theme,
+                        flex: 4,
                       ),
                     _buildSortableColumnHeader(
                       label: 'Status',
@@ -1505,31 +1523,33 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                               ),
                             ),
                           ),
-                          Expanded(
-                            flex: 4,
-                            child: InkWell(
-                              onTap: () => _editTaskInput(originalIndex),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4),
-                                child: Text(
-                                  task.flowInput['input']?.toString() ?? '',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (_writeOutputToFile)
-                            Expanded(
+                          // Dynamic CSV column values
+                          if (_csvColumns.isNotEmpty)
+                            ..._csvColumns.map((columnName) => Expanded(
                               flex: 2,
                               child: InkWell(
-                                onTap: () => _editTaskFilename(originalIndex),
+                                onTap: () => _editTaskColumnValue(originalIndex, columnName),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 4),
                                   child: Text(
-                                    task.filename ?? '-',
-                                    maxLines: 1,
+                                    task.rowData[columnName] ?? '-',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodyMedium,
+                                  ),
+                                ),
+                              ),
+                            ))
+                          else
+                            Expanded(
+                              flex: 4,
+                              child: InkWell(
+                                onTap: () => _editTaskInput(originalIndex),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Text(
+                                    task.flowInput['input']?.toString() ?? '',
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: theme.textTheme.bodyMedium,
                                   ),
@@ -2261,26 +2281,106 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       _logger.i('Reading CSV file: $filePath');
 
       final file = File(filePath);
-      final lines = await file.readAsLines();
+
+      // Try reading with UTF-8 first, fallback to Latin-1 if that fails
+      List<String> lines;
+      try {
+        lines = await file.readAsLines();
+        _logger.d('CSV file read successfully with UTF-8 encoding');
+      } catch (e) {
+        _logger.w('UTF-8 decoding failed, trying Latin-1 encoding: $e');
+        lines = await file.readAsLines(encoding: latin1);
+        _logger.d('CSV file read successfully with Latin-1 encoding');
+      }
 
       _logger.d('CSV file lines: ${lines.length}');
 
-      // Parse CSV manually line by line (simple comma split for basic CSV)
+      // Auto-detect delimiter from first line
+      String delimiter = ',';
+      if (lines.isNotEmpty) {
+        final firstLine = lines[0];
+        final commaCount = ','.allMatches(firstLine).length;
+        final semicolonCount = ';'.allMatches(firstLine).length;
+        final tabCount = '\t'.allMatches(firstLine).length;
+        final pipeCount = '|'.allMatches(firstLine).length;
+
+        // Find the delimiter with the highest count
+        final delimiterCounts = {
+          ',': commaCount,
+          ';': semicolonCount,
+          '\t': tabCount,
+          '|': pipeCount,
+        };
+
+        // Get delimiter with max count (must be at least 1)
+        var maxCount = 0;
+        delimiterCounts.forEach((delim, count) {
+          if (count > maxCount) {
+            maxCount = count;
+            delimiter = delim;
+          }
+        });
+
+        _logger.d('Auto-detected CSV delimiter: "$delimiter" (comma=$commaCount, semicolon=$semicolonCount, tab=$tabCount, pipe=$pipeCount)');
+      }
+
+      // Parse CSV with proper quote handling for multiline values
       final rows = <List<String>>[];
-      for (var i = 0; i < lines.length; i++) {
-        final line = lines[i].trim();
-        if (line.isEmpty) continue;
+      final fullContent = lines.join('\n');
 
-        // Simple split by comma (works for most CSVs without quoted commas)
-        final cells = line.split(',').map((e) => e.trim()).toList();
-        rows.add(cells);
+      var currentRow = <String>[];
+      var currentCell = StringBuffer();
+      var insideQuotes = false;
+      var i = 0;
 
-        if (i < 3) {
-          _logger.d('Line $i: $cells');
+      while (i < fullContent.length) {
+        final char = fullContent[i];
+
+        if (char == '"') {
+          // Check if this is an escaped quote (doubled quote)
+          if (insideQuotes && i + 1 < fullContent.length && fullContent[i + 1] == '"') {
+            currentCell.write('"');
+            i += 2; // Skip both quotes
+            continue;
+          }
+          insideQuotes = !insideQuotes;
+          i++;
+        } else if (!insideQuotes && char == delimiter) {
+          // End of cell
+          currentRow.add(currentCell.toString().trim());
+          currentCell.clear();
+          i++;
+        } else if (!insideQuotes && char == '\n') {
+          // End of row
+          if (currentCell.isNotEmpty || currentRow.isNotEmpty) {
+            currentRow.add(currentCell.toString().trim());
+            if (currentRow.any((cell) => cell.isNotEmpty)) {
+              rows.add(currentRow);
+            }
+            currentRow = <String>[];
+            currentCell.clear();
+          }
+          i++;
+        } else {
+          currentCell.write(char);
+          i++;
+        }
+      }
+
+      // Add last cell and row if any
+      if (currentCell.isNotEmpty || currentRow.isNotEmpty) {
+        currentRow.add(currentCell.toString().trim());
+        if (currentRow.any((cell) => cell.isNotEmpty)) {
+          rows.add(currentRow);
         }
       }
 
       _logger.d('CSV parsed: ${rows.length} rows');
+      if (rows.isNotEmpty && rows.length <= 3) {
+        for (var i = 0; i < rows.length; i++) {
+          _logger.d('Row $i: ${rows[i]}');
+        }
+      }
 
       if (rows.isEmpty) {
         _logger.w('CSV file is empty');
@@ -2292,40 +2392,99 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         return;
       }
 
-      // Skip header row if present (check if first cell looks like a header)
-      final hasHeader = rows.isNotEmpty &&
-          (rows[0][0].toString().toLowerCase().contains('input') ||
-           rows[0][0].toString().toLowerCase().contains('flow'));
-      final dataRows = hasHeader && rows.length > 1
-          ? rows.skip(1).toList()
-          : rows;
+      // Always treat first row as header row
+      if (rows.length < 2) {
+        _logger.w('CSV file needs at least 2 rows (header + data)');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('CSV file needs at least a header row and one data row')),
+          );
+        }
+        return;
+      }
 
-      _logger.d('Processing ${dataRows.length} data rows (after skipping header)');
+      final headers = rows[0].map((h) => h.toString()).toList();
+      final dataRows = rows.skip(1).toList();
+
+      _logger.d('CSV headers: $headers');
+      _logger.d('Processing ${dataRows.length} data rows');
+
+      // Find filename column index (if exists)
+      final filenameColumnIndex = headers.indexWhere(
+        (h) => h.toLowerCase() == 'filename'
+      );
+
+      // Store all CSV columns for display
+      final csvColumns = headers.toList();
+
+      // Add filename column if it doesn't exist and write to file is enabled
+      if (_writeOutputToFile && filenameColumnIndex < 0) {
+        csvColumns.add('filename');
+        _logger.d('Added filename column to CSV columns');
+      }
 
       final uuid = const Uuid();
       final newTasks = <BatchTask>[];
 
       for (final row in dataRows) {
-        final flowInput = row.isNotEmpty ? row[0].toString() : '';
-        final filename = _writeOutputToFile && row.length > 1 ? row[1].toString() : null;
-
-        _logger.d('Processing row: flowInput="$flowInput", filename="$filename"');
-
-        // Validate filename if write output to file is enabled
-        if (_writeOutputToFile && (filename == null || filename.isEmpty)) {
-          _logger.w('Skipping row with missing filename: $flowInput');
-          continue;
+        // Create a map of column name -> value for all columns
+        final rowData = <String, String>{};
+        for (var i = 0; i < headers.length && i < row.length; i++) {
+          final header = headers[i];
+          rowData[header] = row[i].toString();
         }
+
+        // Get filename from the filename column if it exists
+        String? filename;
+        if (filenameColumnIndex >= 0 && filenameColumnIndex < row.length) {
+          filename = row[filenameColumnIndex].toString();
+        }
+
+        // Generate random filename if write output to file is enabled and filename is missing
+        if (_writeOutputToFile && (filename == null || filename.isEmpty)) {
+          filename = '${uuid.v4()}.md';
+          _logger.d('Generated random filename: $filename');
+        }
+
+        // Add filename to rowData if write to file is enabled
+        if (_writeOutputToFile && filename != null) {
+          rowData['filename'] = filename;
+        }
+
+        _logger.d('Processing row: rowData=$rowData, filename="$filename"');
+
+        // Format all row data as "column name: value" separated by newlines
+        // Sanitize column names to avoid special characters that might cause parsing issues
+        final formattedInput = rowData.entries
+            .where((entry) => entry.key.toLowerCase() != 'filename')
+            .map((entry) {
+              // Sanitize column name: remove problematic characters
+              final sanitizedColumnName = entry.key
+                  .replaceAll('{', '')
+                  .replaceAll('}', '')
+                  .replaceAll('[', '')
+                  .replaceAll(']', '')
+                  .replaceAll('"', '')
+                  .replaceAll("'", '')
+                  .trim();
+              return '$sanitizedColumnName: ${entry.value}';
+            })
+            .join('\n');
 
         newTasks.add(BatchTask(
           id: uuid.v4(),
-          flowInput: {'input': flowInput},
+          flowInput: {'input': formattedInput},
+          rowData: rowData,
           filename: filename,
         ));
       }
 
       setState(() {
         _tasks.addAll(newTasks);
+        // Update CSV columns if this is the first import or if tasks were empty
+        if (_csvColumns.isEmpty && csvColumns.isNotEmpty) {
+          _csvColumns = csvColumns;
+        }
       });
 
       _logger.i('Successfully imported ${newTasks.length} tasks from CSV (total rows in CSV: ${dataRows.length})');
@@ -2336,17 +2495,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
             content: Text('Imported ${newTasks.length} tasks from CSV'),
           ),
         );
-
-        // Show warning if some rows were skipped
-        if (_writeOutputToFile && newTasks.length < dataRows.length) {
-          final skipped = dataRows.length - newTasks.length;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Warning: $skipped row(s) skipped due to missing filename'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
       }
     } catch (e, stackTrace) {
       _logger.e(
@@ -2368,26 +2516,106 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
     try {
       final file = File(filePath);
-      final lines = await file.readAsLines();
+
+      // Try reading with UTF-8 first, fallback to Latin-1 if that fails
+      List<String> lines;
+      try {
+        lines = await file.readAsLines();
+        _logger.d('CSV file read successfully with UTF-8 encoding');
+      } catch (e) {
+        _logger.w('UTF-8 decoding failed, trying Latin-1 encoding: $e');
+        lines = await file.readAsLines(encoding: latin1);
+        _logger.d('CSV file read successfully with Latin-1 encoding');
+      }
 
       _logger.d('CSV file lines: ${lines.length}');
 
-      // Parse CSV manually line by line (simple comma split for basic CSV)
+      // Auto-detect delimiter from first line
+      String delimiter = ',';
+      if (lines.isNotEmpty) {
+        final firstLine = lines[0];
+        final commaCount = ','.allMatches(firstLine).length;
+        final semicolonCount = ';'.allMatches(firstLine).length;
+        final tabCount = '\t'.allMatches(firstLine).length;
+        final pipeCount = '|'.allMatches(firstLine).length;
+
+        // Find the delimiter with the highest count
+        final delimiterCounts = {
+          ',': commaCount,
+          ';': semicolonCount,
+          '\t': tabCount,
+          '|': pipeCount,
+        };
+
+        // Get delimiter with max count (must be at least 1)
+        var maxCount = 0;
+        delimiterCounts.forEach((delim, count) {
+          if (count > maxCount) {
+            maxCount = count;
+            delimiter = delim;
+          }
+        });
+
+        _logger.d('Auto-detected CSV delimiter: "$delimiter" (comma=$commaCount, semicolon=$semicolonCount, tab=$tabCount, pipe=$pipeCount)');
+      }
+
+      // Parse CSV with proper quote handling for multiline values
       final rows = <List<String>>[];
-      for (var i = 0; i < lines.length; i++) {
-        final line = lines[i].trim();
-        if (line.isEmpty) continue;
+      final fullContent = lines.join('\n');
 
-        // Simple split by comma (works for most CSVs without quoted commas)
-        final cells = line.split(',').map((e) => e.trim()).toList();
-        rows.add(cells);
+      var currentRow = <String>[];
+      var currentCell = StringBuffer();
+      var insideQuotes = false;
+      var i = 0;
 
-        if (i < 3) {
-          _logger.d('Line $i: $cells');
+      while (i < fullContent.length) {
+        final char = fullContent[i];
+
+        if (char == '"') {
+          // Check if this is an escaped quote (doubled quote)
+          if (insideQuotes && i + 1 < fullContent.length && fullContent[i + 1] == '"') {
+            currentCell.write('"');
+            i += 2; // Skip both quotes
+            continue;
+          }
+          insideQuotes = !insideQuotes;
+          i++;
+        } else if (!insideQuotes && char == delimiter) {
+          // End of cell
+          currentRow.add(currentCell.toString().trim());
+          currentCell.clear();
+          i++;
+        } else if (!insideQuotes && char == '\n') {
+          // End of row
+          if (currentCell.isNotEmpty || currentRow.isNotEmpty) {
+            currentRow.add(currentCell.toString().trim());
+            if (currentRow.any((cell) => cell.isNotEmpty)) {
+              rows.add(currentRow);
+            }
+            currentRow = <String>[];
+            currentCell.clear();
+          }
+          i++;
+        } else {
+          currentCell.write(char);
+          i++;
+        }
+      }
+
+      // Add last cell and row if any
+      if (currentCell.isNotEmpty || currentRow.isNotEmpty) {
+        currentRow.add(currentCell.toString().trim());
+        if (currentRow.any((cell) => cell.isNotEmpty)) {
+          rows.add(currentRow);
         }
       }
 
       _logger.d('CSV parsed: ${rows.length} rows');
+      if (rows.isNotEmpty && rows.length <= 3) {
+        for (var i = 0; i < rows.length; i++) {
+          _logger.d('Row $i: ${rows[i]}');
+        }
+      }
 
       if (rows.isEmpty) {
         _logger.w('CSV file is empty');
@@ -2399,40 +2627,99 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         return;
       }
 
-      // Skip header row if present (check if first cell looks like a header)
-      final hasHeader = rows.isNotEmpty &&
-          (rows[0][0].toString().toLowerCase().contains('input') ||
-           rows[0][0].toString().toLowerCase().contains('flow'));
-      final dataRows = hasHeader && rows.length > 1
-          ? rows.skip(1).toList()
-          : rows;
+      // Always treat first row as header row
+      if (rows.length < 2) {
+        _logger.w('CSV file needs at least 2 rows (header + data)');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('CSV file needs at least a header row and one data row')),
+          );
+        }
+        return;
+      }
 
-      _logger.d('Processing ${dataRows.length} data rows (after skipping header)');
+      final headers = rows[0].map((h) => h.toString()).toList();
+      final dataRows = rows.skip(1).toList();
+
+      _logger.d('CSV headers: $headers');
+      _logger.d('Processing ${dataRows.length} data rows');
+
+      // Find filename column index (if exists)
+      final filenameColumnIndex = headers.indexWhere(
+        (h) => h.toLowerCase() == 'filename'
+      );
+
+      // Store all CSV columns for display
+      final csvColumns = headers.toList();
+
+      // Add filename column if it doesn't exist and write to file is enabled
+      if (_writeOutputToFile && filenameColumnIndex < 0) {
+        csvColumns.add('filename');
+        _logger.d('Added filename column to CSV columns');
+      }
 
       final uuid = const Uuid();
       final newTasks = <BatchTask>[];
 
       for (final row in dataRows) {
-        final flowInput = row.isNotEmpty ? row[0].toString() : '';
-        final filename = _writeOutputToFile && row.length > 1 ? row[1].toString() : null;
-
-        _logger.d('Processing row: flowInput="$flowInput", filename="$filename"');
-
-        // Validate filename if write output to file is enabled
-        if (_writeOutputToFile && (filename == null || filename.isEmpty)) {
-          _logger.w('Skipping row with missing filename: $flowInput');
-          continue;
+        // Create a map of column name -> value for all columns
+        final rowData = <String, String>{};
+        for (var i = 0; i < headers.length && i < row.length; i++) {
+          final header = headers[i];
+          rowData[header] = row[i].toString();
         }
+
+        // Get filename from the filename column if it exists
+        String? filename;
+        if (filenameColumnIndex >= 0 && filenameColumnIndex < row.length) {
+          filename = row[filenameColumnIndex].toString();
+        }
+
+        // Generate random filename if write output to file is enabled and filename is missing
+        if (_writeOutputToFile && (filename == null || filename.isEmpty)) {
+          filename = '${uuid.v4()}.md';
+          _logger.d('Generated random filename: $filename');
+        }
+
+        // Add filename to rowData if write to file is enabled
+        if (_writeOutputToFile && filename != null) {
+          rowData['filename'] = filename;
+        }
+
+        _logger.d('Processing row: rowData=$rowData, filename="$filename"');
+
+        // Format all row data as "column name: value" separated by newlines
+        // Sanitize column names to avoid special characters that might cause parsing issues
+        final formattedInput = rowData.entries
+            .where((entry) => entry.key.toLowerCase() != 'filename')
+            .map((entry) {
+              // Sanitize column name: remove problematic characters
+              final sanitizedColumnName = entry.key
+                  .replaceAll('{', '')
+                  .replaceAll('}', '')
+                  .replaceAll('[', '')
+                  .replaceAll(']', '')
+                  .replaceAll('"', '')
+                  .replaceAll("'", '')
+                  .trim();
+              return '$sanitizedColumnName: ${entry.value}';
+            })
+            .join('\n');
 
         newTasks.add(BatchTask(
           id: uuid.v4(),
-          flowInput: {'input': flowInput},
+          flowInput: {'input': formattedInput},
+          rowData: rowData,
           filename: filename,
         ));
       }
 
       setState(() {
         _tasks.addAll(newTasks);
+        // Update CSV columns if this is the first import or if tasks were empty
+        if (_csvColumns.isEmpty && csvColumns.isNotEmpty) {
+          _csvColumns = csvColumns;
+        }
       });
 
       _logger.i('Successfully imported ${newTasks.length} tasks from CSV (total rows in CSV: ${dataRows.length})');
@@ -2443,17 +2730,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
             content: Text('Imported ${newTasks.length} tasks from CSV'),
           ),
         );
-
-        // Show warning if some rows were skipped
-        if (_writeOutputToFile && newTasks.length < dataRows.length) {
-          final skipped = dataRows.length - newTasks.length;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Warning: $skipped row(s) skipped due to missing filename'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
       }
     } catch (e, stackTrace) {
       _logger.e(
@@ -2554,6 +2830,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
             _tasks[index] = BatchTask(
               id: task.id,
               flowInput: {'input': value},
+              rowData: task.rowData,
               filename: task.filename,
               status: task.status,
               result: task.result,
@@ -2587,7 +2864,70 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
             _tasks[index] = BatchTask(
               id: task.id,
               flowInput: task.flowInput,
+              rowData: task.rowData,
               filename: value.isEmpty ? null : value,
+              status: task.status,
+              result: task.result,
+              error: task.error,
+              credits: task.credits,
+              rawOutput: task.rawOutput,
+              taskId: task.taskId,
+              startTime: task.startTime,
+              endTime: task.endTime,
+              shouldCancel: task.shouldCancel,
+            )..sessionId = task.sessionId
+             ..processedEventIds = task.processedEventIds;
+          });
+        },
+      ),
+    );
+  }
+
+  void _editTaskColumnValue(int index, String columnName) {
+    final task = _tasks[index];
+
+    showDialog(
+      context: context,
+      builder: (context) => _EditFieldDialog(
+        title: 'Edit Column Value',
+        fieldName: columnName,
+        initialValue: task.rowData[columnName] ?? '',
+        onSave: (value) {
+          setState(() {
+            // Update the column value in rowData
+            final updatedRowData = Map<String, String>.from(task.rowData);
+            updatedRowData[columnName] = value;
+
+            // Regenerate the formatted input for the flow
+            // Sanitize column names to avoid special characters that might cause parsing issues
+            final formattedInput = updatedRowData.entries
+                .where((entry) => entry.key.toLowerCase() != 'filename')
+                .map((entry) {
+                  // Sanitize column name: remove problematic characters
+                  final sanitizedColumnName = entry.key
+                      .replaceAll('{', '')
+                      .replaceAll('}', '')
+                      .replaceAll('[', '')
+                      .replaceAll(']', '')
+                      .replaceAll('"', '')
+                      .replaceAll("'", '')
+                      .trim();
+                  return '$sanitizedColumnName: ${entry.value}';
+                })
+                .join('\n');
+
+            // Update filename if the edited column is the filename column
+            String? updatedFilename = task.filename;
+            if (columnName.toLowerCase() == 'filename') {
+              updatedFilename = value.isEmpty ? null : value;
+            }
+
+            // Create new task with updated rowData and flowInput but preserve all execution state
+            _tasks[index] = BatchTask(
+              id: task.id,
+              flowInput: {'input': formattedInput},
+              rowData: updatedRowData,
+              filename: updatedFilename,
               status: task.status,
               result: task.result,
               error: task.error,
@@ -4150,7 +4490,8 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
 
     return Dialog(
       child: Container(
-        width: 500,
+        width: 600,
+        constraints: const BoxConstraints(maxHeight: 500),
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
@@ -4179,22 +4520,29 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
                 ],
               ),
               const SizedBox(height: 24),
-              TextFormField(
-                controller: _controller,
-                autofocus: true,
-                maxLines: widget.fieldName == 'Flow Input' ? 3 : 1,
-                decoration: InputDecoration(
-                  labelText: widget.fieldName,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: TextFormField(
+                    controller: _controller,
+                    autofocus: true,
+                    minLines: 3,
+                    maxLines: null,
+                    keyboardType: TextInputType.multiline,
+                    decoration: InputDecoration(
+                      labelText: widget.fieldName,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignLabelWithHint: true,
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return '${widget.fieldName} cannot be empty';
+                      }
+                      return null;
+                    },
                   ),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '${widget.fieldName} cannot be empty';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: 24),
               Row(

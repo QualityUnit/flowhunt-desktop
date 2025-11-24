@@ -1,6 +1,7 @@
 class BatchTask {
   final String id;
   final Map<String, dynamic> flowInput;
+  final Map<String, String> rowData; // All CSV column data: column_name -> value
   final String? filename;
   String status; // pending, waiting, queued, done, failed, skipped
   String? result;
@@ -17,6 +18,7 @@ class BatchTask {
   BatchTask({
     required this.id,
     required this.flowInput,
+    this.rowData = const {},
     this.filename,
     this.status = 'pending',
     this.result,
@@ -61,9 +63,33 @@ class BatchTask {
     return '${seconds.toStringAsFixed(1)}s';
   }
 
+  // Format all row data as "column name: value" separated by newlines
+  String formatRowDataAsInput() {
+    if (rowData.isEmpty) {
+      return flowInput['input']?.toString() ?? '';
+    }
+
+    return rowData.entries
+        .where((entry) => entry.key.toLowerCase() != 'filename') // Exclude filename column
+        .map((entry) {
+          // Sanitize column name: remove problematic characters
+          final sanitizedColumnName = entry.key
+              .replaceAll('{', '')
+              .replaceAll('}', '')
+              .replaceAll('[', '')
+              .replaceAll(']', '')
+              .replaceAll('"', '')
+              .replaceAll("'", '')
+              .trim();
+          return '$sanitizedColumnName: ${entry.value}';
+        })
+        .join('\n');
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'flow_input': flowInput,
+    'row_data': rowData,
     'filename': filename,
     'status': status,
     'result': result,
@@ -78,6 +104,9 @@ class BatchTask {
   factory BatchTask.fromJson(Map<String, dynamic> json) => BatchTask(
     id: json['id'] as String,
     flowInput: json['flow_input'] as Map<String, dynamic>,
+    rowData: json['row_data'] != null
+        ? Map<String, String>.from(json['row_data'] as Map)
+        : {},
     filename: json['filename'] as String?,
     status: json['status'] as String? ?? 'pending',
     result: json['result'] as String?,
