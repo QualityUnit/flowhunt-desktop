@@ -9,7 +9,6 @@ class BatchTask {
   double? credits; // Credits used (from API result)
   String? rawOutput; // Raw API response for debugging
   String? taskId; // API task ID from flow execution
-  String? sessionId; // Session ID for withSession mode
   Set<String> processedEventIds = {}; // Track processed event IDs to avoid duplicates
   DateTime? startTime;
   DateTime? endTime;

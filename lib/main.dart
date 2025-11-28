@@ -9,10 +9,10 @@ import 'router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize window manager for desktop
   await windowManager.ensureInitialized();
-  
+
   WindowOptions windowOptions = const WindowOptions(
     size: Size(AppConstants.defaultWindowWidth, AppConstants.defaultWindowHeight),
     minimumSize: Size(AppConstants.minWindowWidth, AppConstants.minWindowHeight),
@@ -22,17 +22,23 @@ void main() async {
     titleBarStyle: TitleBarStyle.normal,
     title: AppConstants.appName,
   );
-  
-  windowManager.waitUntilReadyToShow(windowOptions, () async {
+
+  // Wait for window to be ready before running the app
+  await windowManager.waitUntilReadyToShow(windowOptions, () async {
     await windowManager.show();
     await windowManager.focus();
   });
-  
+
   runApp(
     const ProviderScope(
       child: FlowHuntApp(),
     ),
   );
+
+  // Ensure focus after app is running (fixes macOS focus issue)
+  Future.delayed(const Duration(milliseconds: 100), () async {
+    await windowManager.focus();
+  });
 }
 
 class FlowHuntApp extends ConsumerStatefulWidget {

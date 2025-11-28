@@ -113,8 +113,16 @@ class TaskResponse {
     return json;
   }
 
-  factory TaskResponse.fromJson(Map<String, dynamic> json) =>
-      _$TaskResponseFromJson(json);
+  factory TaskResponse.fromJson(Map<String, dynamic> json) {
+    // Handle both 'id' and 'task_id' fields (singleton API may return 'task_id')
+    final id = json['id'] as String? ?? json['task_id'] as String?;
+    return TaskResponse(
+      id: id,
+      status: json['status'] as String?,
+      result: _resultFromJson(json['result']),
+      errorMessage: json['error_message'] as String?,
+    );
+  }
 
   Map<String, dynamic> toJson() => _$TaskResponseToJson(this);
 

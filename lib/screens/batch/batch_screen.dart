@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:csv/csv.dart';
 
 import '../../sdk/models/flow.dart';
 import '../../sdk/models/batch_task.dart';
@@ -17,7 +18,6 @@ import '../../providers/flow_provider.dart';
 enum ExecutionMode {
   singleton,
   normal,
-  withSession,
 }
 
 enum TimeoutPolicy {
@@ -44,25 +44,54 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   bool _overwriteExistingFiles = false; // Overwrite existing files option (disabled by default)
   String _outputDirectory = Directory.current.path; // Default to current directory
   bool _isDragging = false; // Track drag over state
-  String? _currentSessionId; // Current session ID for withSession mode
   int _taskTimeoutSeconds = 3600; // Task timeout in seconds (default: 3600 = 60 minutes)
   TimeoutPolicy _timeoutPolicy = TimeoutPolicy.markAsError; // Default: mark as error on timeout
 
-  // Sorting state
+  // Sorting state for Execute step
   String _sortColumn = 'row'; // row, status, credits, input, filename
   bool _sortAscending = true;
+
+  // Sorting state for Input Data step
+  String _inputDataSortColumn = 'row';
+  bool _inputDataSortAscending = true;
 
   // Filtering state
   Set<String> _statusFilter = {}; // Empty = show all
 
+  // Search state
+  final TextEditingController _inputDataSearchController = TextEditingController();
+  final TextEditingController _executeSearchController = TextEditingController();
+  String _inputDataSearchQuery = '';
+  String _executeSearchQuery = '';
+
+  // Column widths state for resizing
+  Map<String, double> _columnWidths = {};
+
   // CSV columns state
   List<String> _csvColumns = []; // Track CSV column names for display
+
+  // Helper method to check if a status indicates task completion (success)
+  bool _isSuccessStatus(String? status) {
+    if (status == null) return false;
+    final upperStatus = status.toUpperCase();
+    return upperStatus == 'SUCCESS' ||
+           upperStatus == 'DONE' ||
+           upperStatus == 'COMPLETED' ||
+           upperStatus == 'CACHED';
+  }
 
   @override
   void initState() {
     super.initState();
     _loadSavedOutputDirectory();
     _logger.i('🎯 BatchScreen initialized - DropTarget will be enabled');
+  }
+
+  @override
+  void dispose() {
+    _inputDataSearchController.dispose();
+    _executeSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSavedOutputDirectory() async {
@@ -514,10 +543,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                           value: ExecutionMode.normal,
                           child: Text('Normal'),
                         ),
-                        DropdownMenuItem(
-                          value: ExecutionMode.withSession,
-                          child: Text('With Session'),
-                        ),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -545,9 +570,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                         Icon(
                           _executionMode == ExecutionMode.singleton
                               ? Icons.check_circle
-                              : _executionMode == ExecutionMode.withSession
-                                  ? Icons.chat_bubble_outline
-                                  : Icons.info_outline,
+                              : Icons.info_outline,
                           size: 16,
                           color: _executionMode != ExecutionMode.normal
                               ? theme.colorScheme.primary
@@ -557,9 +580,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                         Text(
                           _executionMode == ExecutionMode.singleton
                               ? 'Singleton Mode'
-                              : _executionMode == ExecutionMode.withSession
-                                  ? 'Session Mode'
-                                  : 'Normal Mode',
+                              : 'Normal Mode',
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: _executionMode != ExecutionMode.normal
@@ -573,9 +594,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                     Text(
                       _executionMode == ExecutionMode.singleton
                           ? 'Each task is executed only once for the given input. If the same input is queued multiple times, it will be executed only once.'
-                          : _executionMode == ExecutionMode.withSession
-                              ? 'Each task creates a new flow session. Results can come from cached values, and all messages are stored.'
-                              : 'Each task is executed independently. The same input can be executed multiple times in parallel.',
+                          : 'Each task is executed independently. The same input can be executed multiple times in parallel.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                         fontSize: 12,
@@ -1036,11 +1055,12 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
   Widget _buildInputDataStep() {
     final theme = Theme.of(context);
+    final sortedAndFilteredTasks = _getInputDataSortedTasks();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Action buttons
+        // Action buttons and search
         Row(
           children: [
             ElevatedButton.icon(
@@ -1062,6 +1082,39 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                 },
                 icon: const Icon(Icons.clear),
                 label: const Text('Clear All'),
+              ),
+              const Spacer(),
+              // Search field
+              SizedBox(
+                width: 250,
+                child: TextField(
+                  controller: _inputDataSearchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _inputDataSearchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              setState(() {
+                                _inputDataSearchController.clear();
+                                _inputDataSearchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _inputDataSearchQuery = value.toLowerCase();
+                    });
+                  },
+                ),
               ),
             ],
           ],
@@ -1184,28 +1237,33 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                   ),
                   child: Row(
                     children: [
+                      // Row number column
+                      _buildResizableColumnHeader(
+                        columnKey: 'input_row',
+                        label: '#',
+                        theme: theme,
+                        defaultWidth: 50,
+                        sortColumn: 'row',
+                        isInputDataTable: true,
+                      ),
                       // Dynamic CSV column headers
                       if (_csvColumns.isNotEmpty)
-                        ..._csvColumns.map((columnName) => Expanded(
-                          flex: 2,
-                          child: Text(
-                            columnName,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        ..._csvColumns.asMap().entries.map((entry) => _buildResizableColumnHeader(
+                          columnKey: 'input_${entry.value}',
+                          label: entry.value,
+                          theme: theme,
+                          defaultWidth: 200,
+                          sortColumn: entry.value,
+                          isInputDataTable: true,
                         ))
                       else
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            'Flow Input',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                        _buildResizableColumnHeader(
+                          columnKey: 'input_flowInput',
+                          label: 'Flow Input',
+                          theme: theme,
+                          defaultWidth: 300,
+                          sortColumn: 'input',
+                          isInputDataTable: true,
                         ),
                       const SizedBox(width: 48),
                     ],
@@ -1216,9 +1274,10 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                   height: 400,
                   child: ListView.builder(
                     shrinkWrap: true,
-                    itemCount: _tasks.length,
+                    itemCount: sortedAndFilteredTasks.length,
                     itemBuilder: (context, index) {
-                      final task = _tasks[index];
+                      final task = sortedAndFilteredTasks[index];
+                      final originalIndex = _tasks.indexOf(task);
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
@@ -1230,14 +1289,24 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                         ),
                         child: Row(
                           children: [
+                            // Row number
+                            SizedBox(
+                              width: _columnWidths['input_row'] ?? 50,
+                              child: Text(
+                                '${originalIndex + 1}',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ),
                             // Dynamic CSV column values
                             if (_csvColumns.isNotEmpty)
-                              ..._csvColumns.map((columnName) => Expanded(
-                                flex: 2,
+                              ..._csvColumns.map((columnName) => SizedBox(
+                                width: _columnWidths['input_$columnName'] ?? 200,
                                 child: InkWell(
-                                  onTap: () => _editTaskColumnValue(index, columnName),
+                                  onTap: () => _editTaskColumnValue(originalIndex, columnName),
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                                     child: Text(
                                       task.rowData[columnName] ?? '-',
                                       maxLines: 2,
@@ -1247,12 +1316,12 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                 ),
                               ))
                             else
-                              Expanded(
-                                flex: 2,
+                              SizedBox(
+                                width: _columnWidths['input_flowInput'] ?? 300,
                                 child: InkWell(
-                                  onTap: () => _editTaskInput(index),
+                                  onTap: () => _editTaskInput(originalIndex),
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                                     child: Text(
                                       task.flowInput['input']?.toString() ?? '',
                                       maxLines: 2,
@@ -1261,11 +1330,14 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                   ),
                                 ),
                               ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () {
-                                setState(() => _tasks.removeAt(index));
-                              },
+                            SizedBox(
+                              width: 48,
+                              child: IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () {
+                                  setState(() => _tasks.removeAt(originalIndex));
+                                },
+                              ),
                             ),
                           ],
                         ),
@@ -1314,6 +1386,12 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                   onPressed: _canWriteToFiles() ? _writeOutputsToFiles : null,
                   icon: const Icon(Icons.save_outlined),
                   label: const Text('Write to Files'),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  onPressed: _tasks.isNotEmpty ? _exportToCsv : null,
+                  icon: const Icon(Icons.file_download_outlined),
+                  label: const Text('Export CSV'),
                 ),
               ],
             ),
@@ -1410,7 +1488,45 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+
+        // Search field for Execute step
+        Row(
+          children: [
+            SizedBox(
+              width: 300,
+              child: TextField(
+                controller: _executeSearchController,
+                decoration: InputDecoration(
+                  hintText: 'Search tasks...',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _executeSearchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            setState(() {
+                              _executeSearchController.clear();
+                              _executeSearchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _executeSearchQuery = value.toLowerCase();
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
 
         // Execution monitoring table
         Container(
@@ -1432,56 +1548,67 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                 ),
                 child: Row(
                   children: [
-                    _buildSortableColumnHeader(
+                    _buildResizableColumnHeader(
+                      columnKey: 'exec_row',
                       label: '#',
-                      column: 'row',
                       theme: theme,
-                      width: 50,
+                      defaultWidth: 50,
+                      sortColumn: 'row',
+                      isInputDataTable: false,
                     ),
                     // Dynamic CSV column headers
                     if (_csvColumns.isNotEmpty)
-                      ..._csvColumns.map((columnName) => Expanded(
-                        flex: 2,
-                        child: Text(
-                          columnName,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      ..._csvColumns.asMap().entries.map((entry) => _buildResizableColumnHeader(
+                        columnKey: 'exec_${entry.value}',
+                        label: entry.value,
+                        theme: theme,
+                        defaultWidth: 150,
+                        sortColumn: entry.value,
+                        isInputDataTable: false,
                       ))
                     else
-                      _buildSortableColumnHeader(
+                      _buildResizableColumnHeader(
+                        columnKey: 'exec_input',
                         label: 'Input Value',
-                        column: 'input',
                         theme: theme,
-                        flex: 4,
+                        defaultWidth: 200,
+                        sortColumn: 'input',
+                        isInputDataTable: false,
                       ),
-                    _buildSortableColumnHeader(
+                    _buildResizableColumnHeader(
+                      columnKey: 'exec_status',
                       label: 'Status',
-                      column: 'status',
                       theme: theme,
-                      flex: 1,
+                      defaultWidth: 70,
+                      sortColumn: 'status',
+                      isInputDataTable: false,
                     ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        'Time',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    _buildResizableColumnHeader(
+                      columnKey: 'exec_time',
+                      label: 'Time',
+                      theme: theme,
+                      defaultWidth: 150,
+                      isInputDataTable: false,
                     ),
-                    _buildSortableColumnHeader(
+                    _buildResizableColumnHeader(
+                      columnKey: 'exec_credits',
                       label: 'Credits',
-                      column: 'credits',
                       theme: theme,
-                      flex: 1,
+                      defaultWidth: 100,
+                      sortColumn: 'credits',
+                      isInputDataTable: false,
                     ),
-                    Expanded(
+                    _buildResizableColumnHeader(
+                      columnKey: 'exec_output',
+                      label: 'Output',
+                      theme: theme,
+                      defaultWidth: 80,
+                      isInputDataTable: false,
+                    ),
+                    SizedBox(
+                      width: 48,
                       child: Text(
-                        'Output',
+                        '',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -1515,7 +1642,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           SizedBox(
-                            width: 50,
+                            width: _columnWidths['exec_row'] ?? 50,
                             child: Text(
                               '${originalIndex + 1}',
                               style: theme.textTheme.bodyMedium?.copyWith(
@@ -1525,12 +1652,12 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                           ),
                           // Dynamic CSV column values
                           if (_csvColumns.isNotEmpty)
-                            ..._csvColumns.map((columnName) => Expanded(
-                              flex: 2,
+                            ..._csvColumns.map((columnName) => SizedBox(
+                              width: _columnWidths['exec_$columnName'] ?? 150,
                               child: InkWell(
                                 onTap: () => _editTaskColumnValue(originalIndex, columnName),
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
                                   child: Text(
                                     task.rowData[columnName] ?? '-',
                                     maxLines: 2,
@@ -1541,12 +1668,12 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                               ),
                             ))
                           else
-                            Expanded(
-                              flex: 4,
+                            SizedBox(
+                              width: _columnWidths['exec_input'] ?? 200,
                               child: InkWell(
                                 onTap: () => _editTaskInput(originalIndex),
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
                                   child: Text(
                                     task.flowInput['input']?.toString() ?? '',
                                     maxLines: 2,
@@ -1557,7 +1684,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                               ),
                             ),
                           SizedBox(
-                            width: 50,
+                            width: _columnWidths['exec_status'] ?? 70,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -1602,8 +1729,8 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                               ],
                             ),
                           ),
-                          Expanded(
-                            flex: 2,
+                          SizedBox(
+                            width: _columnWidths['exec_time'] ?? 150,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -1613,6 +1740,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                     ? '${task.startTime!.hour.toString().padLeft(2, '0')}:${task.startTime!.minute.toString().padLeft(2, '0')}:${task.startTime!.second.toString().padLeft(2, '0')} - ${task.endTime != null ? '${task.endTime!.hour.toString().padLeft(2, '0')}:${task.endTime!.minute.toString().padLeft(2, '0')}:${task.endTime!.second.toString().padLeft(2, '0')}' : '...'}'
                                     : '-',
                                   style: theme.textTheme.bodySmall,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 // Duration on second line
                                 Text(
@@ -1625,7 +1753,8 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                               ],
                             ),
                           ),
-                          Expanded(
+                          SizedBox(
+                            width: _columnWidths['exec_credits'] ?? 100,
                             child: Text(
                               task.credits != null
                                 ? task.credits!.toStringAsFixed(6)
@@ -1633,8 +1762,10 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                               style: theme.textTheme.bodySmall,
                             ),
                           ),
-                          Expanded(
+                          SizedBox(
+                            width: _columnWidths['exec_output'] ?? 80,
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 // View icon - shown if there's any output (result or error)
                                 if (task.result != null || task.error != null) ...[
@@ -1657,7 +1788,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                 ],
                                 // Save to file icon - shown if write to file is enabled and task succeeded
                                 if (task.status == 'done' && task.result != null && _writeOutputToFile) ...[
-                                  const SizedBox(width: 4),
                                   IconButton(
                                     icon: const Icon(Icons.save_outlined, size: 16),
                                     padding: EdgeInsets.zero,
@@ -1670,6 +1800,30 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                   ),
                                 ],
                               ],
+                            ),
+                          ),
+                          // Delete button
+                          SizedBox(
+                            width: 48,
+                            child: IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: task.status == 'queued'
+                                    ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                                    : theme.colorScheme.error.withValues(alpha: 0.7),
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              tooltip: task.status == 'queued' ? 'Cannot delete running task' : 'Delete task',
+                              onPressed: task.status == 'queued'
+                                  ? null
+                                  : () {
+                                      setState(() => _tasks.removeAt(originalIndex));
+                                    },
                             ),
                           ),
                         ],
@@ -1816,11 +1970,31 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   }
 
   List<BatchTask> _getSortedTasks() {
-    // First filter
+    // First filter by status
     var tasks = _statusFilter.isEmpty
         ? List<BatchTask>.from(_tasks)
         : _tasks.where((task) => _statusFilter.contains(task.status)).toList();
 
+    // Apply search filter
+    if (_executeSearchQuery.isNotEmpty) {
+      tasks = tasks.where((task) {
+        // Search in row data (CSV columns)
+        final rowDataMatch = task.rowData.values.any(
+          (value) => value.toLowerCase().contains(_executeSearchQuery)
+        );
+        // Search in flow input
+        final inputMatch = task.flowInput['input']?.toString().toLowerCase().contains(_executeSearchQuery) ?? false;
+        // Search in status
+        final statusMatch = task.status.toLowerCase().contains(_executeSearchQuery);
+        // Search in result/error
+        final resultMatch = task.result?.toLowerCase().contains(_executeSearchQuery) ?? false;
+        final errorMatch = task.error?.toLowerCase().contains(_executeSearchQuery) ?? false;
+
+        return rowDataMatch || inputMatch || statusMatch || resultMatch || errorMatch;
+      }).toList();
+    }
+
+    // Sort tasks
     tasks.sort((a, b) {
       int comparison = 0;
 
@@ -1858,6 +2032,14 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
           final bFilename = b.filename ?? '';
           comparison = aFilename.compareTo(bFilename);
           break;
+        default:
+          // Sort by CSV column
+          if (_csvColumns.contains(_sortColumn)) {
+            final aValue = a.rowData[_sortColumn] ?? '';
+            final bValue = b.rowData[_sortColumn] ?? '';
+            comparison = aValue.compareTo(bValue);
+          }
+          break;
       }
 
       return _sortAscending ? comparison : -comparison;
@@ -1866,54 +2048,157 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     return tasks;
   }
 
-  Widget _buildSortableColumnHeader({
+  // Sorting for Input Data step
+  void _sortInputDataTasks(String column) {
+    setState(() {
+      if (_inputDataSortColumn == column) {
+        _inputDataSortAscending = !_inputDataSortAscending;
+      } else {
+        _inputDataSortColumn = column;
+        _inputDataSortAscending = true;
+      }
+    });
+  }
+
+  // Get sorted and filtered tasks for Input Data step
+  List<BatchTask> _getInputDataSortedTasks() {
+    var tasks = List<BatchTask>.from(_tasks);
+
+    // Apply search filter
+    if (_inputDataSearchQuery.isNotEmpty) {
+      tasks = tasks.where((task) {
+        // Search in row data (CSV columns)
+        final rowDataMatch = task.rowData.values.any(
+          (value) => value.toLowerCase().contains(_inputDataSearchQuery)
+        );
+        // Search in flow input
+        final inputMatch = task.flowInput['input']?.toString().toLowerCase().contains(_inputDataSearchQuery) ?? false;
+
+        return rowDataMatch || inputMatch;
+      }).toList();
+    }
+
+    // Sort tasks
+    tasks.sort((a, b) {
+      int comparison = 0;
+
+      switch (_inputDataSortColumn) {
+        case 'row':
+          comparison = _tasks.indexOf(a).compareTo(_tasks.indexOf(b));
+          break;
+        case 'input':
+          final aInput = a.flowInput['input']?.toString() ?? '';
+          final bInput = b.flowInput['input']?.toString() ?? '';
+          comparison = aInput.compareTo(bInput);
+          break;
+        default:
+          // Sort by CSV column
+          if (_csvColumns.contains(_inputDataSortColumn)) {
+            final aValue = a.rowData[_inputDataSortColumn] ?? '';
+            final bValue = b.rowData[_inputDataSortColumn] ?? '';
+            comparison = aValue.compareTo(bValue);
+          }
+          break;
+      }
+
+      return _inputDataSortAscending ? comparison : -comparison;
+    });
+
+    return tasks;
+  }
+
+  // Resizable column header with sorting support
+  Widget _buildResizableColumnHeader({
+    required String columnKey,
     required String label,
-    required String column,
     required ThemeData theme,
-    int flex = 1,
-    double? width,
+    required double defaultWidth,
+    String? sortColumn,
+    bool isInputDataTable = false,
   }) {
-    final isActive = _sortColumn == column;
-    final child = InkWell(
-      onTap: () => _sortTasks(column),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                label,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: isActive
-                      ? theme.colorScheme.primary
-                      : theme.textTheme.titleSmall?.color,
+    final currentWidth = _columnWidths[columnKey] ?? defaultWidth;
+    final isActive = sortColumn != null &&
+        (isInputDataTable ? _inputDataSortColumn == sortColumn : _sortColumn == sortColumn);
+    final sortAscending = isInputDataTable ? _inputDataSortAscending : _sortAscending;
+
+    return SizedBox(
+      width: currentWidth,
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: sortColumn != null
+                  ? () {
+                      if (isInputDataTable) {
+                        _sortInputDataTasks(sortColumn);
+                      } else {
+                        _sortTasks(sortColumn);
+                      }
+                    }
+                  : null,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: isActive
+                              ? theme.colorScheme.primary
+                              : theme.textTheme.titleSmall?.color,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (sortColumn != null) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        isActive
+                            ? (sortAscending ? Icons.arrow_upward : Icons.arrow_downward)
+                            : Icons.unfold_more,
+                        size: 16,
+                        color: isActive
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
-            const SizedBox(width: 4),
-            Icon(
-              isActive
-                  ? (_sortAscending
-                      ? Icons.arrow_upward
-                      : Icons.arrow_downward)
-                  : Icons.unfold_more,
-              size: 16,
-              color: isActive
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+          ),
+          // Resize handle
+          MouseRegion(
+            cursor: SystemMouseCursors.resizeColumn,
+            child: GestureDetector(
+              onHorizontalDragUpdate: (details) {
+                setState(() {
+                  final newWidth = (currentWidth + details.delta.dx).clamp(50.0, 500.0);
+                  _columnWidths[columnKey] = newWidth;
+                });
+              },
+              child: Container(
+                width: 8,
+                height: 24,
+                alignment: Alignment.center,
+                child: Container(
+                  width: 2,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
-
-    if (width != null) {
-      return SizedBox(width: width, child: child);
-    } else {
-      return Expanded(flex: flex, child: child);
-    }
   }
 
   Future<void> _retryTask(BatchTask task) async {
@@ -1940,7 +2225,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       task.startTime = null;
       task.endTime = null;
       task.taskId = null;
-      task.sessionId = null;
       task.shouldCancel = false; // Reset cancel flag
       task.credits = null;
       task.rawOutput = null;
@@ -2841,8 +3125,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
               startTime: task.startTime,
               endTime: task.endTime,
               shouldCancel: task.shouldCancel,
-            )..sessionId = task.sessionId
-             ..processedEventIds = task.processedEventIds;
+            )..processedEventIds = task.processedEventIds;
           });
         },
       ),
@@ -2875,8 +3158,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
               startTime: task.startTime,
               endTime: task.endTime,
               shouldCancel: task.shouldCancel,
-            )..sessionId = task.sessionId
-             ..processedEventIds = task.processedEventIds;
+            )..processedEventIds = task.processedEventIds;
           });
         },
       ),
@@ -2937,8 +3219,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
               startTime: task.startTime,
               endTime: task.endTime,
               shouldCancel: task.shouldCancel,
-            )..sessionId = task.sessionId
-             ..processedEventIds = task.processedEventIds;
+            )..processedEventIds = task.processedEventIds;
           });
         },
       ),
@@ -3178,15 +3459,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
           _logger.i('Polling task ${task.id} (attempt $attempts)');
         }
 
-        // Check if this is a session task (withSession mode)
-        if (task.sessionId != null && _executionMode == ExecutionMode.withSession) {
-          // Poll session responses for withSession mode
-          await _pollSessionTask(task, flowService, workspaceId, attempts, runningTasks, runningTaskIds, pollAttempts, taskQueue, queueIndex);
-          currentPollIndex++;
-          continue;
-        }
-
-        // Regular task status polling for singleton/normal modes
+        // Task status polling for singleton/normal modes
         final statusResponse = await flowService.checkTaskStatus(
           flowId: _selectedFlow!.flowId!,
           taskId: taskIdToCheck,
@@ -3195,7 +3468,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
         _logger.d('Task ${task.id} status: ${statusResponse.status}');
 
-        if (statusResponse.status == 'SUCCESS') {
+        if (_isSuccessStatus(statusResponse.status)) {
           setState(() {
             task.status = 'done';
             task.endTime = DateTime.now();
@@ -3284,148 +3557,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     }
   }
 
-  // Helper method to poll a session task
-  Future<void> _pollSessionTask(
-    BatchTask task,
-    dynamic flowService,
-    String workspaceId,
-    int attempts,
-    Map<String, BatchTask> runningTasks,
-    List<String> runningTaskIds,
-    Map<String, int> pollAttempts,
-    List<BatchTask> taskQueue,
-    int queueIndex,
-  ) async {
-    try {
-      final sessionId = task.sessionId!;
-
-      // Initialize timestamp if not set
-      if (!task.processedEventIds.contains('_timestamp_initialized')) {
-        task.processedEventIds.add('_timestamp_initialized');
-        task.processedEventIds.add((DateTime.now().millisecondsSinceEpoch ~/ 1000).toString());
-      }
-
-      // Get the last timestamp
-      final lastTimestampStr = task.processedEventIds.lastWhere(
-        (id) => int.tryParse(id) != null,
-        orElse: () => (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString(),
-      );
-      int lastTimestamp = int.parse(lastTimestampStr);
-
-      final invocationResponse = await flowService.getSessionResponses(
-        sessionId: sessionId,
-        workspaceId: workspaceId,
-        fromTimestamp: lastTimestamp,
-      );
-
-      // Process messages
-      bool hasNewMessages = false;
-      bool completed = false;
-      List<Map<String, dynamic>> allMessages = [];
-
-      if (task.rawOutput != null && task.rawOutput!.isNotEmpty) {
-        try {
-          final existing = jsonDecode(task.rawOutput!) as List;
-          allMessages = existing.cast<Map<String, dynamic>>();
-        } catch (e) {
-          _logger.w('Failed to parse existing raw output: $e');
-        }
-      }
-
-      if (invocationResponse.messages != null) {
-        for (final message in invocationResponse.messages!) {
-          if (message.eventId != null && !task.processedEventIds.contains(message.eventId)) {
-            task.processedEventIds.add(message.eventId!);
-            allMessages.add(message.toJson());
-            hasNewMessages = true;
-
-            _logger.d('Task ${task.id} - New message: eventType=${message.eventType}, actionType=${message.actionType}');
-
-            // Check if this is an "ai" event_type - final result
-            if (message.eventType == 'ai') {
-              completed = true;
-              String? result;
-              double? credits;
-
-              if (message.metadata != null && message.metadata is Map<String, dynamic>) {
-                final metadata = message.metadata as Map<String, dynamic>;
-                if (metadata['message'] != null) {
-                  result = metadata['message'] as String?;
-                }
-              }
-
-              if (message.credits != null) {
-                credits = message.credits!.abs() / 1000000.0;
-              }
-
-              setState(() {
-                task.status = 'done';
-                task.endTime = DateTime.now();
-                task.result = result ?? 'Session completed';
-                task.credits = credits;
-                task.rawOutput = jsonEncode(allMessages);
-              });
-
-              _logger.i('Task ${task.id} completed via session after $attempts polls');
-              await _writeTaskOutputToFile(task);
-
-              // Remove from running tasks
-              runningTasks.remove(sessionId);
-              runningTaskIds.remove(sessionId);
-              pollAttempts.remove(sessionId);
-              return;
-            }
-
-            // Check for error
-            if (message.actionType == 'error' || message.eventType == 'error') {
-              completed = true;
-              String? errorMessage;
-              if (message.metadata != null && message.metadata is Map<String, dynamic>) {
-                final metadata = message.metadata as Map<String, dynamic>;
-                errorMessage = metadata['error_message'] as String? ?? metadata['message'] as String?;
-              }
-
-              setState(() {
-                task.status = 'failed';
-                task.endTime = DateTime.now();
-                task.error = errorMessage ?? 'Session failed';
-                task.rawOutput = jsonEncode(allMessages);
-              });
-
-              _logger.e('Task ${task.id} failed via session after $attempts polls');
-
-              // Remove from running tasks
-              runningTasks.remove(sessionId);
-              runningTaskIds.remove(sessionId);
-              pollAttempts.remove(sessionId);
-              return;
-            }
-          }
-        }
-      }
-
-      // Update raw output if we have new messages
-      if (hasNewMessages) {
-        setState(() {
-          task.rawOutput = jsonEncode(allMessages);
-        });
-      }
-
-      // Update last timestamp
-      if (invocationResponse.lastTimestamp != null) {
-        task.processedEventIds.removeWhere((id) => int.tryParse(id) != null);
-        task.processedEventIds.add(invocationResponse.lastTimestamp.toString());
-      }
-
-      // Trigger UI update
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (e, stackTrace) {
-      _logger.e('Error polling session task ${task.id}', error: e, stackTrace: stackTrace);
-    }
-  }
-
   // Helper method to start a task and return its taskId
   Future<String?> _startTask(BatchTask task, dynamic flowService, String workspaceId) async {
     try {
@@ -3450,53 +3581,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       });
 
       _logger.d('Starting task ${task.id}: ${task.flowInput}');
-
-      // Handle different execution modes
-      if (_executionMode == ExecutionMode.withSession) {
-        // Session mode: create session, invoke, and start polling in background
-        // We return the session ID immediately so the task is counted as running
-        try {
-          final inputMessage = task.flowInput['input']?.toString() ?? '';
-
-          // Step 1: Create a new session for this task
-          final sessionResponse = await flowService.createSession(
-            flowId: _selectedFlow!.flowId!,
-            workspaceId: workspaceId,
-          );
-
-          final sessionId = sessionResponse.sessionId;
-          if (sessionId == null) {
-            throw Exception('No session ID returned from session creation');
-          }
-
-          setState(() {
-            task.sessionId = sessionId;
-            task.taskId = sessionId; // Use sessionId as taskId for tracking
-          });
-
-          _logger.i('Session created for task ${task.id}: $sessionId');
-
-          // Step 2: Invoke the session with the message
-          await flowService.invokeSession(
-            sessionId: sessionId,
-            workspaceId: workspaceId,
-            message: inputMessage,
-          );
-
-          _logger.i('Session invoked for task ${task.id}, will poll in background');
-
-          // Return sessionId so this task is tracked as running
-          return sessionId;
-        } catch (e, stackTrace) {
-          _logger.e('Failed to start session for task ${task.id}', error: e, stackTrace: stackTrace);
-          setState(() {
-            task.status = 'failed';
-            task.endTime = DateTime.now();
-            task.error = e.toString();
-          });
-          return null;
-        }
-      }
 
       // Convert 'input' to 'human_input' for API compatibility
       final apiFlowInput = {
@@ -3530,9 +3614,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       _logger.i('Task ${task.id} started with ID: $taskId, status: ${initialResponse.status}');
 
-      // If status is already completed (SUCCESS/FAILED) or result is available, handle immediately
+      // If status is already completed (SUCCESS/COMPLETED/CACHED/FAILED) or result is available, handle immediately
       if (initialResponse.status != 'PENDING' || initialResponse.result != null) {
-        if (initialResponse.status == 'SUCCESS') {
+        if (_isSuccessStatus(initialResponse.status)) {
           setState(() {
             task.status = 'done';
             task.endTime = DateTime.now();
@@ -3608,13 +3692,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       _logger.d('Executing task ${task.id}: ${task.flowInput}');
 
-      // Handle different execution modes
-      if (_executionMode == ExecutionMode.withSession) {
-        // Session mode: create session, invoke, and poll for messages
-        await _executeTaskWithSession(task, flowService, workspaceId);
-        return;
-      }
-
       // Convert 'input' to 'human_input' for API compatibility
       final apiFlowInput = {
         'human_input': task.flowInput['input'],
@@ -3663,9 +3740,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       _logger.i('Flow invoked, task ID: $taskId, initial status: ${initialResponse.status}');
 
-      // If status is already completed (SUCCESS/FAILED) or result is available, no need to poll
+      // If status is already completed (SUCCESS/COMPLETED/CACHED/FAILED) or result is available, no need to poll
       if (initialResponse.status != 'PENDING' || initialResponse.result != null) {
-        if (initialResponse.status == 'SUCCESS') {
+        if (_isSuccessStatus(initialResponse.status)) {
           setState(() {
             task.status = 'done';
             task.endTime = DateTime.now();
@@ -3728,7 +3805,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
         _logger.d('Poll attempt $attempts: Task $taskId status: ${statusResponse.status}');
 
-        if (statusResponse.status == 'SUCCESS') {
+        if (_isSuccessStatus(statusResponse.status)) {
           setState(() {
             task.status = 'done';
             task.endTime = DateTime.now();
@@ -3800,209 +3877,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       }
     } catch (e, stackTrace) {
       _logger.e('Task ${task.id} failed', error: e, stackTrace: stackTrace);
-
-      setState(() {
-        task.status = 'failed';
-        task.endTime = DateTime.now();
-        task.error = e.toString();
-      });
-    }
-  }
-
-  Future<void> _executeTaskWithSession(
-    BatchTask task,
-    dynamic flowService,
-    String workspaceId,
-  ) async {
-    try {
-      final inputMessage = task.flowInput['input']?.toString() ?? '';
-
-      _logger.i('=== EXECUTE TASK WITH SESSION ===');
-      _logger.i('Task ID: ${task.id}');
-      _logger.i('Flow ID: ${_selectedFlow!.flowId}');
-      _logger.i('Input message: $inputMessage');
-
-      // Step 1: Create a new session for this task using from_flow endpoint
-      final sessionResponse = await flowService.createSession(
-        flowId: _selectedFlow!.flowId!,
-        workspaceId: workspaceId,
-      );
-
-      final sessionId = sessionResponse.sessionId;
-      if (sessionId == null) {
-        throw Exception('No session ID returned from session creation');
-      }
-
-      setState(() {
-        task.sessionId = sessionId;
-      });
-
-      _logger.i('Session created: $sessionId');
-
-      // Step 2: Invoke the session with the message
-      await flowService.invokeSession(
-        sessionId: sessionId,
-        workspaceId: workspaceId,
-        message: inputMessage,
-      );
-
-      _logger.i('Session invoked, starting to poll for responses');
-
-      // Step 3: Poll for session responses
-      // Use Unix timestamp (seconds since epoch)
-      int lastTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      const pollInterval = Duration(seconds: 2);
-      final maxAttempts = (_taskTimeoutSeconds / 2).round(); // Calculate based on timeout setting
-      int attempts = 0;
-      List<Map<String, dynamic>> allMessages = [];
-      bool completed = false;
-
-      while (attempts < maxAttempts && _isExecuting && !task.shouldCancel && !completed) {
-        await Future.delayed(pollInterval);
-
-        // Yield to UI thread to prevent blocking
-        await Future.microtask(() {});
-
-        attempts++;
-
-        try {
-          final invocationResponse = await flowService.getSessionResponses(
-            sessionId: sessionId,
-            workspaceId: workspaceId,
-            fromTimestamp: lastTimestamp,
-          );
-
-          // Process messages
-          bool hasNewMessages = false;
-          if (invocationResponse.messages != null) {
-            for (final message in invocationResponse.messages!) {
-              // Check for duplicate event_id
-              if (message.eventId != null && !task.processedEventIds.contains(message.eventId)) {
-                task.processedEventIds.add(message.eventId!);
-                allMessages.add(message.toJson());
-                hasNewMessages = true;
-
-                _logger.d('New message: eventId=${message.eventId}, eventType=${message.eventType}, actionType=${message.actionType}');
-
-                // Check if this is an "ai" event_type - this is the final result
-                if (message.eventType == 'ai') {
-                  completed = true;
-
-                  // Extract result from metadata.message field for ai events
-                  String? result;
-                  double? credits;
-
-                  if (message.metadata != null && message.metadata is Map<String, dynamic>) {
-                    final metadata = message.metadata as Map<String, dynamic>;
-                    if (metadata['message'] != null) {
-                      result = metadata['message'] as String?;
-                    }
-                  }
-
-                  // Extract credits if available (credits are negative, convert to positive and divide)
-                  if (message.credits != null) {
-                    credits = message.credits!.abs() / 1000000.0;
-                  }
-
-                  setState(() {
-                    task.status = 'done';
-                    task.endTime = DateTime.now();
-                    task.result = result ?? 'Session completed';
-                    task.credits = credits;
-                    task.rawOutput = jsonEncode(allMessages);
-                  });
-
-                  _logger.i('Task ${task.id} completed via session with AI response after $attempts polls');
-
-                  // Automatically write output to file if enabled
-                  await _writeTaskOutputToFile(task);
-
-                  return;
-                }
-
-                // Check for error in action_type or event_type
-                if (message.actionType == 'error' || message.eventType == 'error') {
-                  completed = true;
-
-                  String? errorMessage;
-                  if (message.metadata != null && message.metadata is Map<String, dynamic>) {
-                    final metadata = message.metadata as Map<String, dynamic>;
-                    errorMessage = metadata['error_message'] as String? ?? metadata['message'] as String?;
-                  }
-
-                  setState(() {
-                    task.status = 'failed';
-                    task.endTime = DateTime.now();
-                    task.error = errorMessage ?? 'Session failed';
-                    task.rawOutput = jsonEncode(allMessages);
-                  });
-
-                  _logger.e('Task ${task.id} failed via session after $attempts polls');
-                  return;
-                }
-              }
-            }
-          }
-
-          // Update raw output immediately when new messages arrive
-          if (hasNewMessages) {
-            setState(() {
-              task.rawOutput = jsonEncode(allMessages);
-            });
-          }
-
-          // Update last timestamp for next poll (API returns Unix timestamp as int)
-          if (invocationResponse.lastTimestamp != null) {
-            lastTimestamp = invocationResponse.lastTimestamp!;
-          }
-
-          // Update UI to refresh duration
-          if (mounted) {
-            setState(() {});
-          }
-
-        } catch (e) {
-          _logger.e('Error polling session responses: $e');
-          // Continue polling despite errors
-        }
-      }
-
-      // Handle timeout or cancellation
-      if (task.shouldCancel) {
-        // Append cancellation info to the messages without replacing result
-        Map<String, dynamic> cancellationInfo = {
-          'event_type': 'system',
-          'action_type': 'cancelled',
-          'cancelled_at': DateTime.now().toIso8601String(),
-          'reason': 'Task cancelled by user',
-        };
-        allMessages.add(cancellationInfo);
-
-        setState(() {
-          task.status = 'failed';
-          task.endTime = DateTime.now();
-          task.error = 'Task cancelled by user';
-          task.rawOutput = jsonEncode(allMessages);
-        });
-        _logger.w('Task ${task.id} cancelled by user (session)');
-      } else if (attempts >= maxAttempts) {
-        throw Exception('Session task timed out after $_taskTimeoutSeconds seconds');
-      } else {
-        // No completion status received but polling stopped
-        setState(() {
-          task.status = 'done';
-          task.endTime = DateTime.now();
-          task.result = 'Session polling completed';
-          task.rawOutput = jsonEncode(allMessages);
-        });
-        _logger.i('Task ${task.id} polling completed (session)');
-
-        // Automatically write output to file if enabled
-        await _writeTaskOutputToFile(task);
-      }
-
-    } catch (e, stackTrace) {
-      _logger.e('Task ${task.id} failed (session)', error: e, stackTrace: stackTrace);
 
       setState(() {
         task.status = 'failed';
@@ -4097,6 +3971,107 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error writing files: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportToCsv() async {
+    if (_tasks.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No tasks to export')),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Get the currently displayed tasks (with search/filter applied)
+      final tasksToExport = _getSortedTasks();
+
+      // Build CSV headers
+      final List<String> headers = ['#'];
+
+      // Add CSV column headers or Input Value
+      if (_csvColumns.isNotEmpty) {
+        headers.addAll(_csvColumns);
+      } else {
+        headers.add('Input Value');
+      }
+
+      // Add fixed columns
+      headers.addAll(['Status', 'Start Time', 'End Time', 'Duration', 'Credits', 'Output', 'Error']);
+
+      // Build CSV rows
+      final List<List<dynamic>> rows = [headers];
+
+      for (final task in tasksToExport) {
+        final originalIndex = _tasks.indexOf(task);
+        final List<dynamic> row = [originalIndex + 1];
+
+        // Add CSV column values or Input Value
+        if (_csvColumns.isNotEmpty) {
+          for (final column in _csvColumns) {
+            row.add(task.rowData[column] ?? '');
+          }
+        } else {
+          row.add(task.flowInput['input']?.toString() ?? '');
+        }
+
+        // Add fixed column values
+        row.add(task.status);
+        row.add(task.startTime != null
+            ? '${task.startTime!.hour.toString().padLeft(2, '0')}:${task.startTime!.minute.toString().padLeft(2, '0')}:${task.startTime!.second.toString().padLeft(2, '0')}'
+            : '');
+        row.add(task.endTime != null
+            ? '${task.endTime!.hour.toString().padLeft(2, '0')}:${task.endTime!.minute.toString().padLeft(2, '0')}:${task.endTime!.second.toString().padLeft(2, '0')}'
+            : '');
+        row.add(task.durationDecimal);
+        row.add(task.credits?.toStringAsFixed(6) ?? '');
+        row.add(task.result ?? '');
+        row.add(task.error ?? '');
+
+        rows.add(row);
+      }
+
+      // Convert to CSV string
+      const converter = ListToCsvConverter();
+      final csvString = converter.convert(rows);
+
+      // Let user pick save location
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Export Tasks to CSV',
+        fileName: 'batch_export_${DateTime.now().millisecondsSinceEpoch}.csv',
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+
+      if (result == null) {
+        _logger.d('Export cancelled by user');
+        return;
+      }
+
+      // Write the file
+      final file = File(result);
+      await file.writeAsString(csvString);
+
+      _logger.i('Exported ${tasksToExport.length} tasks to CSV: $result');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Exported ${tasksToExport.length} tasks to CSV')),
+        );
+      }
+    } catch (e, stackTrace) {
+      _logger.e('Failed to export CSV', error: e, stackTrace: stackTrace);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error exporting CSV: $e'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
