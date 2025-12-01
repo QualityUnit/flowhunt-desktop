@@ -84,6 +84,20 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
            upperStatus == 'CACHED';
   }
 
+  // Helper method to get color for status
+  Color _getStatusColor(String status) {
+    final upperStatus = status.toUpperCase();
+    if (upperStatus == 'SUCCESS' || upperStatus == 'DONE' || upperStatus == 'COMPLETED' || upperStatus == 'CACHED') {
+      return Colors.green;
+    } else if (upperStatus == 'FAILED' || upperStatus == 'ERROR') {
+      return Colors.red;
+    } else if (upperStatus == 'PENDING') {
+      return Colors.orange;
+    } else {
+      return Colors.blue; // RUNNING, PROCESSING, etc.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -2428,6 +2442,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                     Tab(text: 'Input'),
                     Tab(text: 'Output'),
                     Tab(text: 'Raw Output'),
+                    Tab(text: 'Status Log'),
                   ],
                   labelColor: theme.colorScheme.primary,
                   unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.6),
@@ -2564,6 +2579,120 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                 ),
                               ),
                             ),
+                          ),
+                        ],
+                      ),
+                      // Status Log Tab
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: task.statusHistory.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    'No status logs available',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: SingleChildScrollView(
+                                    child: DataTable(
+                                      columnSpacing: 16,
+                                      headingRowHeight: 40,
+                                      dataRowMinHeight: 36,
+                                      dataRowMaxHeight: 60,
+                                      columns: const [
+                                        DataColumn(label: Text('Time')),
+                                        DataColumn(label: Text('Status')),
+                                        DataColumn(label: Text('Raw Response')),
+                                      ],
+                                      rows: task.statusHistory.map((entry) {
+                                        final timeStr = '${entry.timestamp.hour.toString().padLeft(2, '0')}:'
+                                            '${entry.timestamp.minute.toString().padLeft(2, '0')}:'
+                                            '${entry.timestamp.second.toString().padLeft(2, '0')}.'
+                                            '${entry.timestamp.millisecond.toString().padLeft(3, '0')}';
+                                        return DataRow(
+                                          cells: [
+                                            DataCell(Text(timeStr, style: theme.textTheme.bodySmall)),
+                                            DataCell(
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: _getStatusColor(entry.status).withValues(alpha: 0.2),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  entry.status,
+                                                  style: theme.textTheme.bodySmall?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: _getStatusColor(entry.status),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(
+                                              InkWell(
+                                                onTap: () {
+                                                  // Show raw response in a dialog
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (ctx) => AlertDialog(
+                                                      title: Text('Raw Response - $timeStr'),
+                                                      content: SizedBox(
+                                                        width: 600,
+                                                        height: 400,
+                                                        child: SingleChildScrollView(
+                                                          child: SelectableText(
+                                                            entry.rawResponse ?? 'No raw response',
+                                                            style: theme.textTheme.bodySmall?.copyWith(
+                                                              fontFamily: 'monospace',
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      actions: [
+                                                        TextButton.icon(
+                                                          onPressed: () {
+                                                            Clipboard.setData(ClipboardData(text: entry.rawResponse ?? ''));
+                                                            ScaffoldMessenger.of(ctx).showSnackBar(
+                                                              const SnackBar(content: Text('Copied to clipboard')),
+                                                            );
+                                                          },
+                                                          icon: const Icon(Icons.copy, size: 16),
+                                                          label: const Text('Copy'),
+                                                        ),
+                                                        TextButton(
+                                                          onPressed: () => Navigator.of(ctx).pop(),
+                                                          child: const Text('Close'),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                },
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.visibility, size: 16, color: theme.colorScheme.primary),
+                                                    const SizedBox(width: 4),
+                                                    Text('View', style: TextStyle(color: theme.colorScheme.primary)),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ),
                           ),
                         ],
                       ),
@@ -3535,6 +3664,13 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
         _logger.d('Task ${task.id} status: ${statusResponse.status}');
 
+        // Record status check in history
+        task.statusHistory.add(StatusLogEntry(
+          timestamp: DateTime.now(),
+          status: statusResponse.status ?? 'UNKNOWN',
+          rawResponse: jsonEncode(statusResponse.toJson()),
+        ));
+
         if (_isSuccessStatus(statusResponse.status)) {
           setState(() {
             task.status = 'done';
@@ -3688,6 +3824,13 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       _logger.i('Task ${task.id} started with ID: $taskId, status: ${initialResponse.status}');
 
+      // Record initial status in history
+      task.statusHistory.add(StatusLogEntry(
+        timestamp: DateTime.now(),
+        status: initialResponse.status ?? 'UNKNOWN',
+        rawResponse: jsonEncode(initialResponse.toJson()),
+      ));
+
       // If status is already completed (SUCCESS/COMPLETED/CACHED/FAILED) or result is available, handle immediately
       if (initialResponse.status != 'PENDING' || initialResponse.result != null) {
         if (_isSuccessStatus(initialResponse.status)) {
@@ -3814,6 +3957,13 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 
       _logger.i('Flow invoked, task ID: $taskId, initial status: ${initialResponse.status}');
 
+      // Record initial status in history
+      task.statusHistory.add(StatusLogEntry(
+        timestamp: DateTime.now(),
+        status: initialResponse.status ?? 'UNKNOWN',
+        rawResponse: jsonEncode(initialResponse.toJson()),
+      ));
+
       // If status is already completed (SUCCESS/COMPLETED/CACHED/FAILED) or result is available, no need to poll
       if (initialResponse.status != 'PENDING' || initialResponse.result != null) {
         if (_isSuccessStatus(initialResponse.status)) {
@@ -3878,6 +4028,13 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         );
 
         _logger.d('Poll attempt $attempts: Task $taskId status: ${statusResponse.status}');
+
+        // Record status check in history
+        task.statusHistory.add(StatusLogEntry(
+          timestamp: DateTime.now(),
+          status: statusResponse.status ?? 'UNKNOWN',
+          rawResponse: jsonEncode(statusResponse.toJson()),
+        ));
 
         if (_isSuccessStatus(statusResponse.status)) {
           setState(() {

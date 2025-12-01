@@ -1,3 +1,28 @@
+/// Entry for status check log
+class StatusLogEntry {
+  final DateTime timestamp;
+  final String status;
+  final String? rawResponse;
+
+  StatusLogEntry({
+    required this.timestamp,
+    required this.status,
+    this.rawResponse,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'timestamp': timestamp.toIso8601String(),
+    'status': status,
+    'raw_response': rawResponse,
+  };
+
+  factory StatusLogEntry.fromJson(Map<String, dynamic> json) => StatusLogEntry(
+    timestamp: DateTime.parse(json['timestamp'] as String),
+    status: json['status'] as String,
+    rawResponse: json['raw_response'] as String?,
+  );
+}
+
 class BatchTask {
   final String id;
   final Map<String, dynamic> flowInput;
@@ -13,6 +38,7 @@ class BatchTask {
   DateTime? startTime;
   DateTime? endTime;
   bool shouldCancel = false; // Flag to signal task cancellation
+  List<StatusLogEntry> statusHistory = []; // Log of status checks
 
   BatchTask({
     required this.id,
@@ -98,22 +124,34 @@ class BatchTask {
     'task_id': taskId,
     'start_time': startTime?.toIso8601String(),
     'end_time': endTime?.toIso8601String(),
+    'status_history': statusHistory.map((e) => e.toJson()).toList(),
   };
 
-  factory BatchTask.fromJson(Map<String, dynamic> json) => BatchTask(
-    id: json['id'] as String,
-    flowInput: json['flow_input'] as Map<String, dynamic>,
-    rowData: json['row_data'] != null
-        ? Map<String, String>.from(json['row_data'] as Map)
-        : {},
-    filename: json['filename'] as String?,
-    status: json['status'] as String? ?? 'pending',
-    result: json['result'] as String?,
-    error: json['error'] as String?,
-    credits: json['credits'] as double?,
-    rawOutput: json['raw_output'] as String?,
-    taskId: json['task_id'] as String?,
-    startTime: json['start_time'] != null ? DateTime.parse(json['start_time'] as String) : null,
-    endTime: json['end_time'] != null ? DateTime.parse(json['end_time'] as String) : null,
-  );
+  factory BatchTask.fromJson(Map<String, dynamic> json) {
+    final task = BatchTask(
+      id: json['id'] as String,
+      flowInput: json['flow_input'] as Map<String, dynamic>,
+      rowData: json['row_data'] != null
+          ? Map<String, String>.from(json['row_data'] as Map)
+          : {},
+      filename: json['filename'] as String?,
+      status: json['status'] as String? ?? 'pending',
+      result: json['result'] as String?,
+      error: json['error'] as String?,
+      credits: json['credits'] as double?,
+      rawOutput: json['raw_output'] as String?,
+      taskId: json['task_id'] as String?,
+      startTime: json['start_time'] != null ? DateTime.parse(json['start_time'] as String) : null,
+      endTime: json['end_time'] != null ? DateTime.parse(json['end_time'] as String) : null,
+    );
+
+    // Parse status history if present
+    if (json['status_history'] != null) {
+      task.statusHistory = (json['status_history'] as List)
+          .map((e) => StatusLogEntry.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
+    return task;
+  }
 }
