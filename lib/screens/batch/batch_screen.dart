@@ -3561,6 +3561,13 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
           if (mounted) {
             setState(() {});
           }
+        } else {
+          // Unexpected status - log warning and continue polling
+          // This handles statuses like RUNNING, PROCESSING, etc.
+          _logger.w('Unexpected status for task ${task.id}: ${statusResponse.status}, continuing to poll');
+          if (mounted) {
+            setState(() {});
+          }
         }
       } catch (e, stackTrace) {
         _logger.e('Error polling task ${task.id}', error: e, stackTrace: stackTrace);
