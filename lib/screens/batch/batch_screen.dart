@@ -1605,6 +1605,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
               return Scrollbar(
                 controller: _executeTableHorizontalScrollController,
                 thumbVisibility: true,
+                trackVisibility: true,
                 child: SingleChildScrollView(
                   controller: _executeTableHorizontalScrollController,
                   scrollDirection: Axis.horizontal,
@@ -1640,6 +1641,13 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                 sortColumn: 'status',
                                 isInputDataTable: false,
                               ),
+                              _buildResizableColumnHeader(
+                                columnKey: 'exec_output',
+                                label: 'Output',
+                                theme: theme,
+                                defaultWidth: 80,
+                                isInputDataTable: false,
+                              ),
                               // Dynamic CSV column headers
                               if (_csvColumns.isNotEmpty)
                                 ..._csvColumns.asMap().entries.map((entry) => _buildResizableColumnHeader(
@@ -1672,13 +1680,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                 theme: theme,
                                 defaultWidth: 100,
                                 sortColumn: 'credits',
-                                isInputDataTable: false,
-                              ),
-                              _buildResizableColumnHeader(
-                                columnKey: 'exec_output',
-                                label: 'Output',
-                                theme: theme,
-                                defaultWidth: 80,
                                 isInputDataTable: false,
                               ),
                               SizedBox(
@@ -1771,6 +1772,48 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                             ],
                                           ),
                                         ),
+                                        SizedBox(
+                                          width: _columnWidths['exec_output'] ?? 80,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              // View icon - shown if task is running or has any output (result or error)
+                                              if (task.status == 'queued' || task.result != null || task.error != null) ...[
+                                                IconButton(
+                                                  icon: Icon(
+                                                    Icons.visibility_outlined,
+                                                    size: 16,
+                                                    color: task.status == 'queued'
+                                                      ? theme.colorScheme.primary
+                                                      : task.error != null
+                                                        ? theme.colorScheme.error
+                                                        : theme.colorScheme.primary,
+                                                  ),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 24,
+                                                    minHeight: 24,
+                                                  ),
+                                                  tooltip: task.status == 'queued' ? 'View live status' : (task.error != null ? 'View error' : 'View output'),
+                                                  onPressed: () => _showOutputDialog(task),
+                                                ),
+                                              ],
+                                              // Save to file icon - shown if write to file is enabled and task succeeded
+                                              if (task.status == 'done' && task.result != null && _writeOutputToFile) ...[
+                                                IconButton(
+                                                  icon: const Icon(Icons.save_outlined, size: 16),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 24,
+                                                    minHeight: 24,
+                                                  ),
+                                                  tooltip: 'Write to file',
+                                                  onPressed: () => _writeTaskToFile(task),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
                                         // Dynamic CSV column values
                                         if (_csvColumns.isNotEmpty)
                                           ..._csvColumns.map((columnName) => SizedBox(
@@ -1835,48 +1878,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                               ? task.credits!.toStringAsFixed(6)
                                               : '-',
                                             style: theme.textTheme.bodySmall,
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: _columnWidths['exec_output'] ?? 80,
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              // View icon - shown if task is running or has any output (result or error)
-                                              if (task.status == 'queued' || task.result != null || task.error != null) ...[
-                                                IconButton(
-                                                  icon: Icon(
-                                                    Icons.visibility_outlined,
-                                                    size: 16,
-                                                    color: task.status == 'queued'
-                                                      ? theme.colorScheme.primary
-                                                      : task.error != null
-                                                        ? theme.colorScheme.error
-                                                        : theme.colorScheme.primary,
-                                                  ),
-                                                  padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(
-                                                    minWidth: 24,
-                                                    minHeight: 24,
-                                                  ),
-                                                  tooltip: task.status == 'queued' ? 'View live status' : (task.error != null ? 'View error' : 'View output'),
-                                                  onPressed: () => _showOutputDialog(task),
-                                                ),
-                                              ],
-                                              // Save to file icon - shown if write to file is enabled and task succeeded
-                                              if (task.status == 'done' && task.result != null && _writeOutputToFile) ...[
-                                                IconButton(
-                                                  icon: const Icon(Icons.save_outlined, size: 16),
-                                                  padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(
-                                                    minWidth: 24,
-                                                    minHeight: 24,
-                                                  ),
-                                                  tooltip: 'Write to file',
-                                                  onPressed: () => _writeTaskToFile(task),
-                                                ),
-                                              ],
-                                            ],
                                           ),
                                         ),
                                         // Delete button
