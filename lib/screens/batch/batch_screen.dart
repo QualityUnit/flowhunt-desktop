@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -1841,22 +1842,24 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              // View icon - shown if there's any output (result or error)
-                                              if (task.result != null || task.error != null) ...[
+                                              // View icon - shown if task is running or has any output (result or error)
+                                              if (task.status == 'queued' || task.result != null || task.error != null) ...[
                                                 IconButton(
                                                   icon: Icon(
                                                     Icons.visibility_outlined,
                                                     size: 16,
-                                                    color: task.error != null
-                                                      ? theme.colorScheme.error
-                                                      : theme.colorScheme.primary,
+                                                    color: task.status == 'queued'
+                                                      ? theme.colorScheme.primary
+                                                      : task.error != null
+                                                        ? theme.colorScheme.error
+                                                        : theme.colorScheme.primary,
                                                   ),
                                                   padding: EdgeInsets.zero,
                                                   constraints: const BoxConstraints(
                                                     minWidth: 24,
                                                     minHeight: 24,
                                                   ),
-                                                  tooltip: task.error != null ? 'View error' : 'View output',
+                                                  tooltip: task.status == 'queued' ? 'View live status' : (task.error != null ? 'View error' : 'View output'),
                                                   onPressed: () => _showOutputDialog(task),
                                                 ),
                                               ],
@@ -2372,22 +2375,38 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     final controller = TextEditingController(text: task.error ?? task.result ?? '');
     final theme = Theme.of(context);
 
+    // Timer for live updates
+    Timer? refreshTimer;
+
     showDialog(
       context: context,
-      builder: (context) => DefaultTabController(
-        length: 4,
-        child: Dialog(
-          child: Container(
-            width: 700,
-            constraints: const BoxConstraints(maxHeight: 700),
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Row(
+      builder: (context) {
+        // Start timer for live status log updates
+        refreshTimer?.cancel();
+
+        return DefaultTabController(
+          length: 4,
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              // Set up periodic refresh for live updates
+              refreshTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+                if (context.mounted) {
+                  setDialogState(() {});
+                }
+              });
+
+              return Dialog(
+                child: Container(
+                  width: 700,
+                  constraints: const BoxConstraints(maxHeight: 700),
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Row(
                   children: [
                     Icon(
                       task.error != null ? Icons.error_outline : Icons.info_outline,
@@ -2704,12 +2723,16 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () {
+                        refreshTimer?.cancel();
+                        Navigator.of(context).pop();
+                      },
                       child: const Text('Cancel'),
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
                       onPressed: () {
+                        refreshTimer?.cancel();
                         // Save the edited output
                         setState(() {
                           if (task.error != null) {
@@ -2729,14 +2752,20 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                     ),
                   ],
                 ),
-              ],
-            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
-            ),
-          ),
-        ),
-      ),
-    );
+        );
+      },
+    ).then((_) {
+      // Ensure timer is cancelled when dialog is dismissed
+      refreshTimer?.cancel();
+    });
   }
 
   Future<void> _writeTaskToFile(BatchTask task) async {
