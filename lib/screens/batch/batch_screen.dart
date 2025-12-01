@@ -56,7 +56,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   bool _inputDataSortAscending = true;
 
   // Filtering state
-  Set<String> _statusFilter = {}; // Empty = show all
+  final Set<String> _statusFilter = {}; // Empty = show all
 
   // Search state
   final TextEditingController _inputDataSearchController = TextEditingController();
@@ -65,7 +65,11 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   String _executeSearchQuery = '';
 
   // Column widths state for resizing
-  Map<String, double> _columnWidths = {};
+  final Map<String, double> _columnWidths = {};
+
+  // Horizontal scroll controllers for tables
+  final ScrollController _inputTableHorizontalScrollController = ScrollController();
+  final ScrollController _executeTableHorizontalScrollController = ScrollController();
 
   // CSV columns state
   List<String> _csvColumns = []; // Track CSV column names for display
@@ -91,6 +95,8 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   void dispose() {
     _inputDataSearchController.dispose();
     _executeSearchController.dispose();
+    _inputTableHorizontalScrollController.dispose();
+    _executeTableHorizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -1223,131 +1229,161 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                     ? theme.colorScheme.primaryContainer.withValues(alpha: 0.1)
                     : null,
                 ),
-                child: Column(
-              children: [
-                // Table header
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(8),
-                      topRight: Radius.circular(8),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      // Row number column
-                      _buildResizableColumnHeader(
-                        columnKey: 'input_row',
-                        label: '#',
-                        theme: theme,
-                        defaultWidth: 50,
-                        sortColumn: 'row',
-                        isInputDataTable: true,
-                      ),
-                      // Dynamic CSV column headers
-                      if (_csvColumns.isNotEmpty)
-                        ..._csvColumns.asMap().entries.map((entry) => _buildResizableColumnHeader(
-                          columnKey: 'input_${entry.value}',
-                          label: entry.value,
-                          theme: theme,
-                          defaultWidth: 200,
-                          sortColumn: entry.value,
-                          isInputDataTable: true,
-                        ))
-                      else
-                        _buildResizableColumnHeader(
-                          columnKey: 'input_flowInput',
-                          label: 'Flow Input',
-                          theme: theme,
-                          defaultWidth: 300,
-                          sortColumn: 'input',
-                          isInputDataTable: true,
-                        ),
-                      const SizedBox(width: 48),
-                    ],
-                  ),
-                ),
-                // Table rows
-                SizedBox(
-                  height: 400,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: sortedAndFilteredTasks.length,
-                    itemBuilder: (context, index) {
-                      final task = sortedAndFilteredTasks[index];
-                      final originalIndex = _tasks.indexOf(task);
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                child: Builder(
+                  builder: (context) {
+                    // Calculate total content width based on column widths
+                    double totalWidth = (_columnWidths['input_row'] ?? 50) + 48 + 32; // row + actions + padding
+                    if (_csvColumns.isNotEmpty) {
+                      for (final col in _csvColumns) {
+                        totalWidth += _columnWidths['input_$col'] ?? 200;
+                      }
+                    } else {
+                      totalWidth += _columnWidths['input_flowInput'] ?? 300;
+                    }
+
+                    return Column(
+                      children: [
+                        // Scrollable table
+                        Scrollbar(
+                          controller: _inputTableHorizontalScrollController,
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            controller: _inputTableHorizontalScrollController,
+                            scrollDirection: Axis.horizontal,
+                            child: SizedBox(
+                              width: totalWidth,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Table header
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.surfaceContainerHighest,
+                                      borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(8),
+                                        topRight: Radius.circular(8),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        // Row number column
+                                        _buildResizableColumnHeader(
+                                          columnKey: 'input_row',
+                                          label: '#',
+                                          theme: theme,
+                                          defaultWidth: 50,
+                                          sortColumn: 'row',
+                                          isInputDataTable: true,
+                                        ),
+                                        // Dynamic CSV column headers
+                                        if (_csvColumns.isNotEmpty)
+                                          ..._csvColumns.asMap().entries.map((entry) => _buildResizableColumnHeader(
+                                            columnKey: 'input_${entry.value}',
+                                            label: entry.value,
+                                            theme: theme,
+                                            defaultWidth: 200,
+                                            sortColumn: entry.value,
+                                            isInputDataTable: true,
+                                          ))
+                                        else
+                                          _buildResizableColumnHeader(
+                                            columnKey: 'input_flowInput',
+                                            label: 'Flow Input',
+                                            theme: theme,
+                                            defaultWidth: 300,
+                                            sortColumn: 'input',
+                                            isInputDataTable: true,
+                                          ),
+                                        const SizedBox(width: 48),
+                                      ],
+                                    ),
+                                  ),
+                                  // Table rows
+                                  SizedBox(
+                                    height: 400,
+                                    child: ListView.builder(
+                                      itemCount: sortedAndFilteredTasks.length,
+                                      itemBuilder: (context, index) {
+                                        final task = sortedAndFilteredTasks[index];
+                                        final originalIndex = _tasks.indexOf(task);
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              // Row number
+                                              SizedBox(
+                                                width: _columnWidths['input_row'] ?? 50,
+                                                child: Text(
+                                                  '${originalIndex + 1}',
+                                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                                  ),
+                                                ),
+                                              ),
+                                              // Dynamic CSV column values
+                                              if (_csvColumns.isNotEmpty)
+                                                ..._csvColumns.map((columnName) => SizedBox(
+                                                  width: _columnWidths['input_$columnName'] ?? 200,
+                                                  child: InkWell(
+                                                    onTap: () => _editTaskColumnValue(originalIndex, columnName),
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                                      child: Text(
+                                                        task.rowData[columnName] ?? '-',
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ))
+                                              else
+                                                SizedBox(
+                                                  width: _columnWidths['input_flowInput'] ?? 300,
+                                                  child: InkWell(
+                                                    onTap: () => _editTaskInput(originalIndex),
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                                      child: Text(
+                                                        task.flowInput['input']?.toString() ?? '',
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              SizedBox(
+                                                width: 48,
+                                                child: IconButton(
+                                                  icon: const Icon(Icons.delete_outline),
+                                                  onPressed: () {
+                                                    setState(() => _tasks.removeAt(originalIndex));
+                                                  },
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            // Row number
-                            SizedBox(
-                              width: _columnWidths['input_row'] ?? 50,
-                              child: Text(
-                                '${originalIndex + 1}',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                ),
-                              ),
-                            ),
-                            // Dynamic CSV column values
-                            if (_csvColumns.isNotEmpty)
-                              ..._csvColumns.map((columnName) => SizedBox(
-                                width: _columnWidths['input_$columnName'] ?? 200,
-                                child: InkWell(
-                                  onTap: () => _editTaskColumnValue(originalIndex, columnName),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                                    child: Text(
-                                      task.rowData[columnName] ?? '-',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-                              ))
-                            else
-                              SizedBox(
-                                width: _columnWidths['input_flowInput'] ?? 300,
-                                child: InkWell(
-                                  onTap: () => _editTaskInput(originalIndex),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                                    child: Text(
-                                      task.flowInput['input']?.toString() ?? '',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            SizedBox(
-                              width: 48,
-                              child: IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () {
-                                  setState(() => _tasks.removeAt(originalIndex));
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                      ],
+                    );
+                  },
                 ),
-              ],
-            ),
-          ),
+              ),
         ),
       ],
     );
@@ -1534,307 +1570,336 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
             border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Column(
-            children: [
-              // Table header
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
+          child: Builder(
+            builder: (context) {
+              // Calculate total content width based on column widths
+              double totalWidth = (_columnWidths['exec_row'] ?? 50) +
+                  (_columnWidths['exec_status'] ?? 70) +
+                  (_columnWidths['exec_time'] ?? 150) +
+                  (_columnWidths['exec_credits'] ?? 100) +
+                  (_columnWidths['exec_output'] ?? 80) +
+                  48 + 32; // delete button + padding
+              if (_csvColumns.isNotEmpty) {
+                for (final col in _csvColumns) {
+                  totalWidth += _columnWidths['exec_$col'] ?? 150;
+                }
+              } else {
+                totalWidth += _columnWidths['exec_input'] ?? 200;
+              }
+
+              return Scrollbar(
+                controller: _executeTableHorizontalScrollController,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _executeTableHorizontalScrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: totalWidth,
+                    child: Column(
+                      children: [
+                        // Table header
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(8),
+                              topRight: Radius.circular(8),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              _buildResizableColumnHeader(
+                                columnKey: 'exec_row',
+                                label: '#',
+                                theme: theme,
+                                defaultWidth: 50,
+                                sortColumn: 'row',
+                                isInputDataTable: false,
+                              ),
+                              _buildResizableColumnHeader(
+                                columnKey: 'exec_status',
+                                label: 'Status',
+                                theme: theme,
+                                defaultWidth: 70,
+                                sortColumn: 'status',
+                                isInputDataTable: false,
+                              ),
+                              // Dynamic CSV column headers
+                              if (_csvColumns.isNotEmpty)
+                                ..._csvColumns.asMap().entries.map((entry) => _buildResizableColumnHeader(
+                                  columnKey: 'exec_${entry.value}',
+                                  label: entry.value,
+                                  theme: theme,
+                                  defaultWidth: 150,
+                                  sortColumn: entry.value,
+                                  isInputDataTable: false,
+                                ))
+                              else
+                                _buildResizableColumnHeader(
+                                  columnKey: 'exec_input',
+                                  label: 'Input Value',
+                                  theme: theme,
+                                  defaultWidth: 200,
+                                  sortColumn: 'input',
+                                  isInputDataTable: false,
+                                ),
+                              _buildResizableColumnHeader(
+                                columnKey: 'exec_time',
+                                label: 'Time',
+                                theme: theme,
+                                defaultWidth: 150,
+                                isInputDataTable: false,
+                              ),
+                              _buildResizableColumnHeader(
+                                columnKey: 'exec_credits',
+                                label: 'Credits',
+                                theme: theme,
+                                defaultWidth: 100,
+                                sortColumn: 'credits',
+                                isInputDataTable: false,
+                              ),
+                              _buildResizableColumnHeader(
+                                columnKey: 'exec_output',
+                                label: 'Output',
+                                theme: theme,
+                                defaultWidth: 80,
+                                isInputDataTable: false,
+                              ),
+                              SizedBox(
+                                width: 48,
+                                child: Text(
+                                  '',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Table rows
+                        SizedBox(
+                          height: 400,
+                          child: Builder(
+                            builder: (context) {
+                              final sortedTasks = _getSortedTasks();
+                              return ListView.builder(
+                                itemCount: sortedTasks.length,
+                                itemBuilder: (context, index) {
+                                  final task = sortedTasks[index];
+                                  final originalIndex = _tasks.indexOf(task);
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        SizedBox(
+                                          width: _columnWidths['exec_row'] ?? 50,
+                                          child: Text(
+                                            '${originalIndex + 1}',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: _columnWidths['exec_status'] ?? 70,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              _buildStatusBadge(task, theme),
+                                              const SizedBox(width: 4),
+                                              if (task.status == 'waiting' || task.status == 'pending') ...[
+                                                IconButton(
+                                                  icon: const Icon(Icons.play_arrow, size: 16),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 20,
+                                                    minHeight: 20,
+                                                  ),
+                                                  tooltip: 'Start task',
+                                                  onPressed: () => _startSingleTask(task),
+                                                ),
+                                              ],
+                                              if (task.status == 'queued') ...[
+                                                IconButton(
+                                                  icon: const Icon(Icons.stop, size: 16),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 20,
+                                                    minHeight: 20,
+                                                  ),
+                                                  tooltip: 'Stop task',
+                                                  onPressed: () => _stopSingleTask(task),
+                                                ),
+                                              ],
+                                              if (task.status == 'done' || task.status == 'failed' || task.status == 'skipped') ...[
+                                                IconButton(
+                                                  icon: const Icon(Icons.refresh, size: 16),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 20,
+                                                    minHeight: 20,
+                                                  ),
+                                                  tooltip: 'Retry task',
+                                                  onPressed: () => _retryTask(task),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        // Dynamic CSV column values
+                                        if (_csvColumns.isNotEmpty)
+                                          ..._csvColumns.map((columnName) => SizedBox(
+                                            width: _columnWidths['exec_$columnName'] ?? 150,
+                                            child: InkWell(
+                                              onTap: () => _editTaskColumnValue(originalIndex, columnName),
+                                              child: Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                                                child: Text(
+                                                  task.rowData[columnName] ?? '-',
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: theme.textTheme.bodyMedium,
+                                                ),
+                                              ),
+                                            ),
+                                          ))
+                                        else
+                                          SizedBox(
+                                            width: _columnWidths['exec_input'] ?? 200,
+                                            child: InkWell(
+                                              onTap: () => _editTaskInput(originalIndex),
+                                              child: Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                                                child: Text(
+                                                  task.flowInput['input']?.toString() ?? '',
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: theme.textTheme.bodyMedium,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        SizedBox(
+                                          width: _columnWidths['exec_time'] ?? 150,
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              // Start - End time
+                                              Text(
+                                                task.startTime != null
+                                                  ? '${task.startTime!.hour.toString().padLeft(2, '0')}:${task.startTime!.minute.toString().padLeft(2, '0')}:${task.startTime!.second.toString().padLeft(2, '0')} - ${task.endTime != null ? '${task.endTime!.hour.toString().padLeft(2, '0')}:${task.endTime!.minute.toString().padLeft(2, '0')}:${task.endTime!.second.toString().padLeft(2, '0')}' : '...'}'
+                                                  : '-',
+                                                style: theme.textTheme.bodySmall,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              // Duration on second line
+                                              Text(
+                                                task.durationDecimal,
+                                                style: theme.textTheme.bodySmall?.copyWith(
+                                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: _columnWidths['exec_credits'] ?? 100,
+                                          child: Text(
+                                            task.credits != null
+                                              ? task.credits!.toStringAsFixed(6)
+                                              : '-',
+                                            style: theme.textTheme.bodySmall,
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: _columnWidths['exec_output'] ?? 80,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              // View icon - shown if there's any output (result or error)
+                                              if (task.result != null || task.error != null) ...[
+                                                IconButton(
+                                                  icon: Icon(
+                                                    Icons.visibility_outlined,
+                                                    size: 16,
+                                                    color: task.error != null
+                                                      ? theme.colorScheme.error
+                                                      : theme.colorScheme.primary,
+                                                  ),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 24,
+                                                    minHeight: 24,
+                                                  ),
+                                                  tooltip: task.error != null ? 'View error' : 'View output',
+                                                  onPressed: () => _showOutputDialog(task),
+                                                ),
+                                              ],
+                                              // Save to file icon - shown if write to file is enabled and task succeeded
+                                              if (task.status == 'done' && task.result != null && _writeOutputToFile) ...[
+                                                IconButton(
+                                                  icon: const Icon(Icons.save_outlined, size: 16),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 24,
+                                                    minHeight: 24,
+                                                  ),
+                                                  tooltip: 'Write to file',
+                                                  onPressed: () => _writeTaskToFile(task),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        // Delete button
+                                        SizedBox(
+                                          width: 48,
+                                          child: IconButton(
+                                            icon: Icon(
+                                              Icons.delete_outline,
+                                              size: 18,
+                                              color: task.status == 'queued'
+                                                  ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                                                  : theme.colorScheme.error.withValues(alpha: 0.7),
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(
+                                              minWidth: 32,
+                                              minHeight: 32,
+                                            ),
+                                            tooltip: task.status == 'queued' ? 'Cannot delete running task' : 'Delete task',
+                                            onPressed: task.status == 'queued'
+                                                ? null
+                                                : () {
+                                                    setState(() => _tasks.removeAt(originalIndex));
+                                                  },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                child: Row(
-                  children: [
-                    _buildResizableColumnHeader(
-                      columnKey: 'exec_row',
-                      label: '#',
-                      theme: theme,
-                      defaultWidth: 50,
-                      sortColumn: 'row',
-                      isInputDataTable: false,
-                    ),
-                    // Dynamic CSV column headers
-                    if (_csvColumns.isNotEmpty)
-                      ..._csvColumns.asMap().entries.map((entry) => _buildResizableColumnHeader(
-                        columnKey: 'exec_${entry.value}',
-                        label: entry.value,
-                        theme: theme,
-                        defaultWidth: 150,
-                        sortColumn: entry.value,
-                        isInputDataTable: false,
-                      ))
-                    else
-                      _buildResizableColumnHeader(
-                        columnKey: 'exec_input',
-                        label: 'Input Value',
-                        theme: theme,
-                        defaultWidth: 200,
-                        sortColumn: 'input',
-                        isInputDataTable: false,
-                      ),
-                    _buildResizableColumnHeader(
-                      columnKey: 'exec_status',
-                      label: 'Status',
-                      theme: theme,
-                      defaultWidth: 70,
-                      sortColumn: 'status',
-                      isInputDataTable: false,
-                    ),
-                    _buildResizableColumnHeader(
-                      columnKey: 'exec_time',
-                      label: 'Time',
-                      theme: theme,
-                      defaultWidth: 150,
-                      isInputDataTable: false,
-                    ),
-                    _buildResizableColumnHeader(
-                      columnKey: 'exec_credits',
-                      label: 'Credits',
-                      theme: theme,
-                      defaultWidth: 100,
-                      sortColumn: 'credits',
-                      isInputDataTable: false,
-                    ),
-                    _buildResizableColumnHeader(
-                      columnKey: 'exec_output',
-                      label: 'Output',
-                      theme: theme,
-                      defaultWidth: 80,
-                      isInputDataTable: false,
-                    ),
-                    SizedBox(
-                      width: 48,
-                      child: Text(
-                        '',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Table rows
-              SizedBox(
-                height: 400,
-                child: Builder(
-                  builder: (context) {
-                    final sortedTasks = _getSortedTasks();
-                    return ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: sortedTasks.length,
-                      itemBuilder: (context, index) {
-                        final task = sortedTasks[index];
-                        final originalIndex = _tasks.indexOf(task);
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(
-                            color: theme.colorScheme.outline.withValues(alpha: 0.2),
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            width: _columnWidths['exec_row'] ?? 50,
-                            child: Text(
-                              '${originalIndex + 1}',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                              ),
-                            ),
-                          ),
-                          // Dynamic CSV column values
-                          if (_csvColumns.isNotEmpty)
-                            ..._csvColumns.map((columnName) => SizedBox(
-                              width: _columnWidths['exec_$columnName'] ?? 150,
-                              child: InkWell(
-                                onTap: () => _editTaskColumnValue(originalIndex, columnName),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                                  child: Text(
-                                    task.rowData[columnName] ?? '-',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
-                                ),
-                              ),
-                            ))
-                          else
-                            SizedBox(
-                              width: _columnWidths['exec_input'] ?? 200,
-                              child: InkWell(
-                                onTap: () => _editTaskInput(originalIndex),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                                  child: Text(
-                                    task.flowInput['input']?.toString() ?? '',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          SizedBox(
-                            width: _columnWidths['exec_status'] ?? 70,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildStatusBadge(task, theme),
-                                const SizedBox(width: 4),
-                                if (task.status == 'waiting' || task.status == 'pending') ...[
-                                  IconButton(
-                                    icon: const Icon(Icons.play_arrow, size: 16),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 20,
-                                      minHeight: 20,
-                                    ),
-                                    tooltip: 'Start task',
-                                    onPressed: () => _startSingleTask(task),
-                                  ),
-                                ],
-                                if (task.status == 'queued') ...[
-                                  IconButton(
-                                    icon: const Icon(Icons.stop, size: 16),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 20,
-                                      minHeight: 20,
-                                    ),
-                                    tooltip: 'Stop task',
-                                    onPressed: () => _stopSingleTask(task),
-                                  ),
-                                ],
-                                if (task.status == 'done' || task.status == 'failed') ...[
-                                  IconButton(
-                                    icon: const Icon(Icons.refresh, size: 16),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 20,
-                                      minHeight: 20,
-                                    ),
-                                    tooltip: 'Retry task',
-                                    onPressed: () => _retryTask(task),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          SizedBox(
-                            width: _columnWidths['exec_time'] ?? 150,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Start - End time
-                                Text(
-                                  task.startTime != null
-                                    ? '${task.startTime!.hour.toString().padLeft(2, '0')}:${task.startTime!.minute.toString().padLeft(2, '0')}:${task.startTime!.second.toString().padLeft(2, '0')} - ${task.endTime != null ? '${task.endTime!.hour.toString().padLeft(2, '0')}:${task.endTime!.minute.toString().padLeft(2, '0')}:${task.endTime!.second.toString().padLeft(2, '0')}' : '...'}'
-                                    : '-',
-                                  style: theme.textTheme.bodySmall,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                // Duration on second line
-                                Text(
-                                  task.durationDecimal,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(
-                            width: _columnWidths['exec_credits'] ?? 100,
-                            child: Text(
-                              task.credits != null
-                                ? task.credits!.toStringAsFixed(6)
-                                : '-',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ),
-                          SizedBox(
-                            width: _columnWidths['exec_output'] ?? 80,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // View icon - shown if there's any output (result or error)
-                                if (task.result != null || task.error != null) ...[
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.visibility_outlined,
-                                      size: 16,
-                                      color: task.error != null
-                                        ? theme.colorScheme.error
-                                        : theme.colorScheme.primary,
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 24,
-                                      minHeight: 24,
-                                    ),
-                                    tooltip: task.error != null ? 'View error' : 'View output',
-                                    onPressed: () => _showOutputDialog(task),
-                                  ),
-                                ],
-                                // Save to file icon - shown if write to file is enabled and task succeeded
-                                if (task.status == 'done' && task.result != null && _writeOutputToFile) ...[
-                                  IconButton(
-                                    icon: const Icon(Icons.save_outlined, size: 16),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 24,
-                                      minHeight: 24,
-                                    ),
-                                    tooltip: 'Write to file',
-                                    onPressed: () => _writeTaskToFile(task),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          // Delete button
-                          SizedBox(
-                            width: 48,
-                            child: IconButton(
-                              icon: Icon(
-                                Icons.delete_outline,
-                                size: 18,
-                                color: task.status == 'queued'
-                                    ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                                    : theme.colorScheme.error.withValues(alpha: 0.7),
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 32,
-                                minHeight: 32,
-                              ),
-                              tooltip: task.status == 'queued' ? 'Cannot delete running task' : 'Delete task',
-                              onPressed: task.status == 'queued'
-                                  ? null
-                                  : () {
-                                      setState(() => _tasks.removeAt(originalIndex));
-                                    },
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ],
@@ -3132,39 +3197,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     );
   }
 
-  void _editTaskFilename(int index) {
-    final task = _tasks[index];
-
-    showDialog(
-      context: context,
-      builder: (context) => _EditFieldDialog(
-        title: 'Edit Filename',
-        fieldName: 'Filename',
-        initialValue: task.filename ?? '',
-        onSave: (value) {
-          setState(() {
-            // Create new task with updated filename but preserve all execution state
-            _tasks[index] = BatchTask(
-              id: task.id,
-              flowInput: task.flowInput,
-              rowData: task.rowData,
-              filename: value.isEmpty ? null : value,
-              status: task.status,
-              result: task.result,
-              error: task.error,
-              credits: task.credits,
-              rawOutput: task.rawOutput,
-              taskId: task.taskId,
-              startTime: task.startTime,
-              endTime: task.endTime,
-              shouldCancel: task.shouldCancel,
-            )..processedEventIds = task.processedEventIds;
-          });
-        },
-      ),
-    );
-  }
-
   void _editTaskColumnValue(int index, String columnName) {
     final task = _tasks[index];
 
@@ -3857,7 +3889,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
         };
 
         if (currentRawOutput != null && currentRawOutput.isNotEmpty) {
-          task.rawOutput = currentRawOutput + '\n\n--- CANCELLED ---\n' + jsonEncode(cancellationInfo);
+          task.rawOutput = '$currentRawOutput\n\n--- CANCELLED ---\n${jsonEncode(cancellationInfo)}';
         } else {
           task.rawOutput = jsonEncode(cancellationInfo);
         }
