@@ -2404,30 +2404,20 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                     color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        'Input: ${task.flowInput['input']?.toString() ?? ''}',
-                        style: theme.textTheme.bodySmall,
-                      ),
                       if (task.filename != null) ...[
-                        const SizedBox(height: 4),
                         Text(
                           'Filename: ${task.filename}',
                           style: theme.textTheme.bodySmall,
                         ),
+                        const SizedBox(width: 16),
                       ],
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(
-                            'Status: ',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                          _buildStatusBadge(task, theme),
-                        ],
+                      Text(
+                        'Status: ',
+                        style: theme.textTheme.bodySmall,
                       ),
+                      _buildStatusBadge(task, theme),
                     ],
                   ),
                 ),
@@ -2435,7 +2425,8 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                 // Tab Bar
                 TabBar(
                   tabs: const [
-                    Tab(text: 'Extracted Value'),
+                    Tab(text: 'Input'),
+                    Tab(text: 'Output'),
                     Tab(text: 'Raw Output'),
                   ],
                   labelColor: theme.colorScheme.primary,
@@ -2448,7 +2439,51 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                   height: 400,
                   child: TabBarView(
                     children: [
-                      // Extracted Value Tab
+                      // Input Tab
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton.icon(
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: task.flowInput['input']?.toString() ?? ''));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Copied to clipboard'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.copy, size: 16),
+                                label: const Text('Copy'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: SingleChildScrollView(
+                                child: SelectableText(
+                                  task.flowInput['input']?.toString() ?? 'No input available',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Output Tab
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
