@@ -2375,7 +2375,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     showDialog(
       context: context,
       builder: (context) => DefaultTabController(
-        length: 2,
+        length: 4,
         child: Dialog(
           child: Container(
             width: 700,
