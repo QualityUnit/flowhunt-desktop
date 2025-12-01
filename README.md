@@ -106,6 +106,42 @@ For detailed instructions including:
 
 See **[BUILD-GUIDE.md](BUILD-GUIDE.md)** for the complete documentation.
 
+## Releasing
+
+Releases are created automatically via GitHub Actions when you push a tag.
+
+### Release a specific platform
+
+```bash
+# Windows release
+git tag windows-1.0.0
+git push origin windows-1.0.0
+
+# Linux release
+git tag linux-1.0.0
+git push origin linux-1.0.0
+
+# macOS release (run locally on Mac)
+./release-macos.sh 1.0.0
+```
+
+### Tag format
+
+| Platform | Tag pattern | Example | Output |
+|----------|-------------|---------|--------|
+| Windows | `windows-*` | `windows-1.0.0` | `FlowHunt-Desktop-Windows-1.0.0.zip` |
+| Linux | `linux-*` | `linux-1.0.0` | `FlowHunt-Desktop-Linux-1.0.0.tar.gz` |
+| macOS | `macos-*` | `macos-1.0.0` | `FlowHunt-Desktop-1.0.0-macOS.dmg` |
+
+### Full release (all platforms)
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This triggers the main build workflow that builds all platforms and creates a single release.
+
 ## Configuration
 
 The app uses the following configuration:
