@@ -1,0 +1,53 @@
+name: Build Windows Release
+
+on:
+  push:
+    tags:
+      - 'windows-*'
+
+jobs:
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#windows-}" >> $GITHUB_OUTPUT
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.9.0'
+          channel: 'stable'
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Windows app
+        run: flutter build windows --release
+
+      - name: Create ZIP package
+        run: |
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath FlowHunt-Desktop-Windows-${{ steps.version.outputs.VERSION }}.zip
+        shell: powershell
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: FlowHunt-Desktop-Windows-${{ steps.version.outputs.VERSION }}.zip
+          retention-days: 30
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: FlowHunt-Desktop-Windows-${{ steps.version.outputs.VERSION }}.zip
+          name: Windows ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
