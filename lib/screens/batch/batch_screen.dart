@@ -11,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:csv/csv.dart';
 
-import '../../sdk/models/flow.dart';
 import '../../sdk/models/batch_task.dart';
 import '../../providers/workspace_provider.dart';
 import '../../providers/flow_provider.dart';
@@ -36,7 +35,7 @@ class BatchScreen extends ConsumerStatefulWidget {
 class _BatchScreenState extends ConsumerState<BatchScreen> {
   final Logger _logger = Logger();
   int _currentStep = 0;
-  FlowResponse? _selectedFlow;
+  FlowWithSource? _selectedFlow;
   final List<BatchTask> _tasks = [];
   int _parallelExecutions = 5;
   bool _isExecuting = false;
@@ -305,11 +304,11 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
       return const Text('No workspace selected');
     }
 
-    final flowsAsync = ref.watch(flowsProvider(workspaceId));
+    final flowsAsync = ref.watch(combinedFlowsProvider(workspaceId));
 
     return flowsAsync.when(
       data: (flows) {
-        _logger.i('Batch screen received ${flows.length} flows');
+        _logger.i('Batch screen received ${flows.length} flows (workspace + public)');
 
         if (flows.isEmpty) {
           _logger.w('No flows received from API');
@@ -3289,7 +3288,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     }
   }
 
-  void _showFlowPicker(BuildContext context, List<FlowResponse> flows) {
+  void _showFlowPicker(BuildContext context, List<FlowWithSource> flows) {
     showDialog(
       context: context,
       builder: (context) => _FlowPickerDialog(
@@ -4342,9 +4341,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
 }
 
 class _FlowPickerDialog extends StatefulWidget {
-  final List<FlowResponse> flows;
-  final FlowResponse? selectedFlow;
-  final ValueChanged<FlowResponse> onFlowSelected;
+  final List<FlowWithSource> flows;
+  final FlowWithSource? selectedFlow;
+  final ValueChanged<FlowWithSource> onFlowSelected;
 
   const _FlowPickerDialog({
     required this.flows,
@@ -4358,7 +4357,7 @@ class _FlowPickerDialog extends StatefulWidget {
 
 class _FlowPickerDialogState extends State<_FlowPickerDialog> {
   final TextEditingController _searchController = TextEditingController();
-  List<FlowResponse> _filteredFlows = [];
+  List<FlowWithSource> _filteredFlows = [];
 
   @override
   void initState() {
@@ -4386,6 +4385,100 @@ class _FlowPickerDialogState extends State<_FlowPickerDialog> {
         }).toList();
       }
     });
+  }
+
+  Widget _buildGroupedFlowList(ThemeData theme) {
+    // Separate workspace and public flows
+    final workspaceFlows = _filteredFlows.where((f) => !f.isPublic).toList();
+    final publicFlows = _filteredFlows.where((f) => f.isPublic).toList();
+
+    return ListView(
+      shrinkWrap: true,
+      children: [
+        // Workspace flows section
+        if (workspaceFlows.isNotEmpty) ...[
+          _buildSectionHeader(theme, 'Workspace Flows', Icons.lock_outline, workspaceFlows.length),
+          ...workspaceFlows.map((flow) => _buildFlowTile(theme, flow)),
+        ],
+        // Public flows section
+        if (publicFlows.isNotEmpty) ...[
+          _buildSectionHeader(theme, 'Public Flows', Icons.public, publicFlows.length),
+          ...publicFlows.map((flow) => _buildFlowTile(theme, flow)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(ThemeData theme, String title, IconData icon, int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '$count',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFlowTile(ThemeData theme, FlowWithSource flow) {
+    final isSelected = flow.flowId == widget.selectedFlow?.flowId;
+
+    return ListTile(
+      selected: isSelected,
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isSelected ? Icons.check_circle : Icons.circle_outlined,
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+          ),
+          const SizedBox(width: 8),
+          Icon(
+            flow.isPublic ? Icons.public : Icons.lock_outline,
+            size: 16,
+            color: flow.isPublic
+                ? theme.colorScheme.tertiary.withValues(alpha: 0.7)
+                : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+          ),
+        ],
+      ),
+      title: Text(
+        flow.name ?? 'Unnamed Flow',
+        style: theme.textTheme.bodyLarge?.copyWith(
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      subtitle: flow.description != null && flow.description!.isNotEmpty
+          ? Text(
+              flow.description!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            )
+          : null,
+      onTap: () => widget.onFlowSelected(flow),
+    );
   }
 
   @override
@@ -4491,38 +4584,7 @@ class _FlowPickerDialogState extends State<_FlowPickerDialog> {
                         ),
                       ),
                     )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _filteredFlows.length,
-                      itemBuilder: (context, index) {
-                        final flow = _filteredFlows[index];
-                        final isSelected = flow.flowId == widget.selectedFlow?.flowId;
-
-                        return ListTile(
-                          selected: isSelected,
-                          leading: Icon(
-                            isSelected ? Icons.check_circle : Icons.circle_outlined,
-                            color: isSelected
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurface.withValues(alpha: 0.3),
-                          ),
-                          title: Text(
-                            flow.name ?? 'Unnamed Flow',
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                          ),
-                          subtitle: flow.description != null && flow.description!.isNotEmpty
-                              ? Text(
-                                  flow.description!,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                )
-                              : null,
-                          onTap: () => widget.onFlowSelected(flow),
-                        );
-                      },
-                    ),
+                  : _buildGroupedFlowList(theme),
             ),
 
             // Footer
