@@ -3,9 +3,6 @@ import '../sdk/models/flow.dart';
 import '../sdk/services/flow_service.dart';
 import 'user_provider.dart';
 
-// Public workspace ID constant
-const String publicWorkspaceId = '00000000-0000-0000-0000-000000000000';
-
 // Wrapper class to track flow source (workspace vs public)
 class FlowWithSource {
   final FlowResponse flow;
@@ -41,16 +38,14 @@ final flowsProvider = FutureProvider.family<List<FlowResponse>, String>((ref, wo
   return flowService.getFlows(workspaceId: workspaceId);
 });
 
-// Provider for fetching flows from both current workspace and public workspace
+// Provider for fetching flows from both current workspace and public flows
 final combinedFlowsProvider = FutureProvider.family<List<FlowWithSource>, String>((ref, workspaceId) async {
   final flowService = ref.watch(flowServiceProvider);
 
-  // Fetch flows from both workspaces in parallel
+  // Fetch workspace flows and public flows in parallel
   final results = await Future.wait([
     flowService.getFlows(workspaceId: workspaceId),
-    workspaceId != publicWorkspaceId
-        ? flowService.getFlows(workspaceId: publicWorkspaceId)
-        : Future.value(<FlowResponse>[]),
+    flowService.getAllPublicFlows(workspaceId: workspaceId),
   ]);
 
   final workspaceFlows = results[0];

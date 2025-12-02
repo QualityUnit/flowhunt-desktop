@@ -11,14 +11,14 @@ class FlowService {
     required FlowHuntApiClient apiClient,
   }) : _apiClient = apiClient;
 
-  /// Get all flows for a workspace
+  /// Get all flows for a workspace (private workspace flows)
   Future<List<FlowResponse>> getFlows({
     required String workspaceId,
     int? limit,
     int? offset,
   }) async {
     try {
-      _logger.d('Fetching flows for workspace: $workspaceId (limit: $limit, offset: $offset)');
+      _logger.d('Fetching workspace flows for: $workspaceId (limit: $limit, offset: $offset)');
 
       final request = FlowSearchRequest(
         limit: limit,
@@ -57,6 +57,56 @@ class FlowService {
     } catch (e, stackTrace) {
       _logger.e(
         'Failed to fetch flows for workspace: $workspaceId',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
+    }
+  }
+
+  /// Get all public flows (from all workspaces)
+  Future<List<FlowResponse>> getAllPublicFlows({
+    required String workspaceId,
+    int? limit,
+    int? offset,
+  }) async {
+    try {
+      _logger.d('Fetching public flows (limit: $limit, offset: $offset)');
+
+      final request = FlowSearchRequest(
+        limit: limit,
+        offset: offset,
+      );
+
+      final response = await _apiClient.post<List<dynamic>>(
+        '/flows/all',
+        queryParameters: {'workspace_id': workspaceId},
+        data: request.toJson(),
+      );
+
+      _logger.d('Raw API response type: ${response.runtimeType}');
+      _logger.d('Raw API response length: ${response.length}');
+
+      final flows = response.map((json) {
+        try {
+          final flow = FlowResponse.fromJson(json as Map<String, dynamic>);
+          _logger.d('Parsed public flow: ${flow.flowId} - ${flow.name}');
+          return flow;
+        } catch (e) {
+          _logger.e('Failed to parse public flow from JSON: $json', error: e);
+          rethrow;
+        }
+      }).toList();
+
+      _logger.i('Successfully fetched ${flows.length} public flows');
+
+      final validFlows = flows.where((f) => f.flowId != null && f.name != null).length;
+      _logger.i('Valid public flows (with flowId and name): $validFlows');
+
+      return flows;
+    } catch (e, stackTrace) {
+      _logger.e(
+        'Failed to fetch public flows',
         error: e,
         stackTrace: stackTrace,
       );
