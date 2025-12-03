@@ -2616,6 +2616,7 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                   ),
                                 )
                               : Container(
+                                  width: double.infinity,
                                   decoration: BoxDecoration(
                                     border: Border.all(
                                       color: theme.colorScheme.outline.withValues(alpha: 0.5),
@@ -2623,17 +2624,19 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: SingleChildScrollView(
-                                    child: DataTable(
-                                      columnSpacing: 16,
-                                      headingRowHeight: 40,
-                                      dataRowMinHeight: 36,
-                                      dataRowMaxHeight: 60,
-                                      columns: const [
-                                        DataColumn(label: Text('Time')),
-                                        DataColumn(label: Text('Status')),
-                                        DataColumn(label: Text('Raw Response')),
-                                      ],
-                                      rows: task.statusHistory.map((entry) {
+                                    child: SizedBox(
+                                      width: double.infinity,
+                                      child: DataTable(
+                                        columnSpacing: 16,
+                                        headingRowHeight: 40,
+                                        dataRowMinHeight: 36,
+                                        dataRowMaxHeight: 60,
+                                        columns: const [
+                                          DataColumn(label: Text('Time')),
+                                          DataColumn(label: Text('Status')),
+                                          DataColumn(label: Text('Raw Response')),
+                                        ],
+                                        rows: task.statusHistory.toList().reversed.map((entry) {
                                         final timeStr = '${entry.timestamp.hour.toString().padLeft(2, '0')}:'
                                             '${entry.timestamp.minute.toString().padLeft(2, '0')}:'
                                             '${entry.timestamp.second.toString().padLeft(2, '0')}.'
@@ -2708,7 +2711,8 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                             ),
                                           ],
                                         );
-                                      }).toList(),
+                                        }).toList(),
+                                      ),
                                     ),
                                   ),
                                 ),
