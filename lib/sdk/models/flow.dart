@@ -115,12 +115,14 @@ class TaskResponse {
 
   factory TaskResponse.fromJson(Map<String, dynamic> json) {
     // Handle both 'id' and 'task_id' fields (singleton API may return 'task_id')
+    // Use the generated function and override id if needed
+    final taskResponse = _$TaskResponseFromJson(json);
     final id = json['id'] as String? ?? json['task_id'] as String?;
     return TaskResponse(
-      id: id,
-      status: json['status'] as String?,
-      result: _resultFromJson(json['result']),
-      errorMessage: json['error_message'] as String?,
+      id: id ?? taskResponse.id,
+      status: taskResponse.status,
+      result: taskResponse.result,
+      errorMessage: taskResponse.errorMessage,
     );
   }
 
@@ -129,7 +131,7 @@ class TaskResponse {
   // Helper getters for backwards compatibility
   String? get taskId => id;
 
-  // Extract the AI answer from the nested result structure
+  // Extract the AI answer from the result - only use ai_answer field
   String? get aiAnswer {
     if (result == null) return null;
 
@@ -147,58 +149,9 @@ class TaskResponse {
         return null;
       }
 
-      // First, check if there's a direct ai_answer field
+      // Only use the ai_answer field from the result
       if (resultMap.containsKey('ai_answer')) {
         return resultMap['ai_answer'] as String?;
-      }
-
-      // Only use the extraction logic if status is SUCCESS
-      if (status == 'SUCCESS') {
-        // Extract content from outputs structure
-        final outputs = resultMap['outputs'];
-        if (outputs is List && outputs.isNotEmpty) {
-          final firstOutput = outputs[0];
-          if (firstOutput is Map<String, dynamic>) {
-            final innerOutputs = firstOutput['outputs'];
-            if (innerOutputs is List) {
-              String content = '';
-
-              for (final output in innerOutputs) {
-                if (output is Map<String, dynamic>) {
-                  // Navigate to results.message.result
-                  final results = output['results'];
-                  if (results is Map<String, dynamic>) {
-                    final message = results['message'];
-                    if (message is Map<String, dynamic>) {
-                      final messageResult = message['result'];
-                      if (messageResult is String && messageResult.isNotEmpty) {
-                        String part = messageResult.trim();
-
-                        // Remove code fence markers if present
-                        if (part.startsWith('```')) {
-                          final lines = part.split('\n');
-                          if (lines.length > 1) {
-                            part = lines.sublist(1).join('\n').trim();
-                          }
-                        }
-                        if (part.endsWith('```')) {
-                          part = part.substring(0, part.length - 3).trim();
-                        }
-
-                        content += part + '\n';
-                      }
-                    }
-                  }
-                }
-              }
-
-              content = content.trim();
-              if (content.isNotEmpty) {
-                return content;
-              }
-            }
-          }
-        }
       }
 
       return null;

@@ -63,11 +63,21 @@ class FlowAssistantState {
 }
 
 // Flow Assistant Notifier
-class FlowAssistantNotifier extends StateNotifier<FlowAssistantState> {
-  final FlowAssistantService _service;
+class FlowAssistantNotifier extends Notifier<FlowAssistantState> {
+  late final FlowAssistantService _service;
   final Logger _logger = Logger();
 
-  FlowAssistantNotifier(this._service) : super(const FlowAssistantState());
+  @override
+  FlowAssistantState build() {
+    _service = ref.watch(flowAssistantServiceProvider);
+
+    // Handle cleanup when the notifier is disposed
+    ref.onDispose(() {
+      _service.dispose();
+    });
+
+    return const FlowAssistantState();
+  }
 
   // Initialize a new chat session
   Future<void> initializeSession({
@@ -251,18 +261,12 @@ class FlowAssistantNotifier extends StateNotifier<FlowAssistantState> {
     }
   }
 
-  @override
-  void dispose() {
-    _service.dispose();
-    super.dispose();
-  }
 }
 
 // Flow Assistant State Provider
 final flowAssistantProvider =
-    StateNotifierProvider<FlowAssistantNotifier, FlowAssistantState>((ref) {
-  final service = ref.watch(flowAssistantServiceProvider);
-  return FlowAssistantNotifier(service);
+    NotifierProvider<FlowAssistantNotifier, FlowAssistantState>(() {
+  return FlowAssistantNotifier();
 });
 
 // Note: Session listing is not available in the current API

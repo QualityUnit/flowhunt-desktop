@@ -27,28 +27,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   late AnimationController _sidebarAnimationController;
   late Animation<double> _sidebarAnimation;
 
-  // Track if we're in a conversation (will be updated by child widget)
-  bool _isInConversation = false;
-
-  // Callback to update conversation state
-  void _updateConversationState(bool inConversation) {
-    setState(() {
-      _isInConversation = inConversation;
-    });
-  }
-
-  // Callback to handle new chat
-  void _handleNewChat() {
-    // Clear the session first
-    ref.read(flowAssistantProvider.notifier).clearSession();
-
-    setState(() {
-      _isInConversation = false;
-      // Force rebuild of AI Assistant Chat widget by changing key
-      _selectedIndex = 0;
-    });
-  }
-
   List<_NavigationItem> get _navigationItems => [
     // Home - HIDDEN (not ready yet)
     // _NavigationItem(
@@ -68,13 +46,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       label: 'Batch',
     ),
   ];
-
-  // Settings item separated to be placed at the bottom
-  _NavigationItem get _settingsItem => _NavigationItem(
-    icon: Icons.settings_outlined,
-    selectedIcon: Icons.settings,
-    label: 'Settings',
-  );
 
   List<_NavigationItem> get _settingsMenuItems => [
     _NavigationItem(
@@ -409,60 +380,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           },
                         ),
                       ),
-                      // Settings button at the bottom (only in main menu) - HIDDEN
-                      if (false) ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 2,
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _isInSettingsMenu = true;
-                                  _selectedIndex = 2; // Select Addons by default
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: _isSidebarCollapsed ? 8 : 16,
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: _isSidebarCollapsed
-                                    ? MainAxisAlignment.center
-                                    : MainAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      _settingsItem.icon,
-                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                      size: 24,
-                                    ),
-                                    if (!_isSidebarCollapsed) ...[
-                                      const SizedBox(width: 16),
-                                      Text(
-                                        _settingsItem.label,
-                                        style: TextStyle(
-                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                                          fontWeight: FontWeight.normal,
-                                          fontSize: 15,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
                     ],
                   ),
                 ),
@@ -612,55 +529,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           return const BatchScreen();
       }
     }
-  }
-
-  Widget _buildComingSoonContent(String title, IconData icon) {
-    final theme = Theme.of(context);
-
-    return Container(
-      color: theme.colorScheme.surface.withValues(alpha: 0.3),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Icon(
-                icon,
-                size: 64,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Coming Soon',
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'This feature will be available in a future update',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildConnectorsContent() {
@@ -1139,12 +1007,7 @@ class _NavigationItem {
 
 // AI Assistant Chat Widget with new centered initial design
 class _AIAssistantChat extends ConsumerStatefulWidget {
-  final Function(bool)? onConversationStateChanged;
-
-  const _AIAssistantChat({
-    super.key,
-    this.onConversationStateChanged,
-  });
+  const _AIAssistantChat();
 
   @override
   ConsumerState<_AIAssistantChat> createState() => _AIAssistantChatState();
@@ -1156,7 +1019,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
   final FocusNode _focusNode = FocusNode();
   bool _hasStartedConversation = false;
   bool _isChatSidebarVisible = false; // Start with sidebar collapsed
-  String _selectedModel = 'GPT-4';
+  final String _selectedModel = 'GPT-4';
   late String _mainPromptText;
   bool _lastReportedState = false; // Track last reported state to parent
 
@@ -1178,7 +1041,6 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
     // Notify parent that we're no longer in a conversation only if state changed
     if (mounted && _lastReportedState != false) {
       _lastReportedState = false;
-      widget.onConversationStateChanged?.call(false);
     }
   }
 
@@ -1203,7 +1065,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
       }
       // Notify parent about initial conversation state
       if (mounted) {
-        widget.onConversationStateChanged?.call(_hasStartedConversation);
+        // State notification removed - functionality disabled
       }
     });
   }
@@ -1249,7 +1111,6 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
     // Notify parent that we're now in a conversation only if state changed
     if (_lastReportedState != true) {
       _lastReportedState = true;
-      widget.onConversationStateChanged?.call(true);
     }
 
     _messageController.clear();
@@ -1321,7 +1182,7 @@ class _AIAssistantChatState extends ConsumerState<_AIAssistantChat> {
       _lastReportedState = showChatView;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          widget.onConversationStateChanged?.call(showChatView);
+          // State notification removed - functionality disabled
         }
       });
     }

@@ -64,8 +64,8 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
   String _inputDataSearchQuery = '';
   String _executeSearchQuery = '';
 
-  // Column widths state for resizing
-  final Map<String, double> _columnWidths = {};
+  // Column flex ratios for proportional sizing (relative widths that stretch to 100%)
+  final Map<String, double> _columnFlex = {};
 
   // Horizontal scroll controllers for tables
   final ScrollController _inputTableHorizontalScrollController = ScrollController();
@@ -1243,160 +1243,141 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                     ? theme.colorScheme.primaryContainer.withValues(alpha: 0.1)
                     : null,
                 ),
-                child: Builder(
-                  builder: (context) {
-                    // Calculate total content width based on column widths
-                    double totalWidth = (_columnWidths['input_row'] ?? 50) + 48 + 32; // row + actions + padding
-                    if (_csvColumns.isNotEmpty) {
-                      for (final col in _csvColumns) {
-                        totalWidth += _columnWidths['input_$col'] ?? 200;
-                      }
-                    } else {
-                      totalWidth += _columnWidths['input_flowInput'] ?? 300;
-                    }
-
-                    return Column(
+                child: Column(
                       children: [
-                        // Scrollable table
-                        Scrollbar(
-                          controller: _inputTableHorizontalScrollController,
-                          thumbVisibility: true,
-                          child: SingleChildScrollView(
-                            controller: _inputTableHorizontalScrollController,
-                            scrollDirection: Axis.horizontal,
-                            child: SizedBox(
-                              width: totalWidth,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Table header
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.surfaceContainerHighest,
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(8),
-                                        topRight: Radius.circular(8),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        // Row number column
-                                        _buildResizableColumnHeader(
-                                          columnKey: 'input_row',
-                                          label: '#',
-                                          theme: theme,
-                                          defaultWidth: 50,
-                                          sortColumn: 'row',
-                                          isInputDataTable: true,
-                                        ),
-                                        // Dynamic CSV column headers
-                                        if (_csvColumns.isNotEmpty)
-                                          ..._csvColumns.asMap().entries.map((entry) => _buildResizableColumnHeader(
-                                            columnKey: 'input_${entry.value}',
-                                            label: entry.value,
-                                            theme: theme,
-                                            defaultWidth: 200,
-                                            sortColumn: entry.value,
-                                            isInputDataTable: true,
-                                          ))
-                                        else
-                                          _buildResizableColumnHeader(
-                                            columnKey: 'input_flowInput',
-                                            label: 'Flow Input',
-                                            theme: theme,
-                                            defaultWidth: 300,
-                                            sortColumn: 'input',
-                                            isInputDataTable: true,
-                                          ),
-                                        const SizedBox(width: 48),
-                                      ],
+                        // Table header - uses full width with flex columns
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(8),
+                              topRight: Radius.circular(8),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              // Row number column with delete action
+                              _buildFlexColumnHeader(
+                                columnKey: 'input_row',
+                                label: '#',
+                                theme: theme,
+                                defaultFlex: 0.5,
+                                sortColumn: 'row',
+                                isInputDataTable: true,
+                              ),
+                              // Dynamic CSV column headers
+                              if (_csvColumns.isNotEmpty)
+                                ..._csvColumns.asMap().entries.map((entry) => _buildFlexColumnHeader(
+                                  columnKey: 'input_${entry.value}',
+                                  label: entry.value,
+                                  theme: theme,
+                                  defaultFlex: 1.5,
+                                  sortColumn: entry.value,
+                                  isInputDataTable: true,
+                                ))
+                              else
+                                _buildFlexColumnHeader(
+                                  columnKey: 'input_flowInput',
+                                  label: 'Flow Input',
+                                  theme: theme,
+                                  defaultFlex: 3.0,
+                                  sortColumn: 'input',
+                                  isInputDataTable: true,
+                                ),
+                            ],
+                          ),
+                        ),
+                        // Table rows
+                        SizedBox(
+                          height: 400,
+                          child: ListView.builder(
+                            itemCount: sortedAndFilteredTasks.length,
+                            itemBuilder: (context, index) {
+                              final task = sortedAndFilteredTasks[index];
+                              final originalIndex = _tasks.indexOf(task);
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: theme.colorScheme.outline.withValues(alpha: 0.2),
                                     ),
                                   ),
-                                  // Table rows
-                                  SizedBox(
-                                    height: 400,
-                                    child: ListView.builder(
-                                      itemCount: sortedAndFilteredTasks.length,
-                                      itemBuilder: (context, index) {
-                                        final task = sortedAndFilteredTasks[index];
-                                        final originalIndex = _tasks.indexOf(task);
-                                        return Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                          decoration: BoxDecoration(
-                                            border: Border(
-                                              bottom: BorderSide(
-                                                color: theme.colorScheme.outline.withValues(alpha: 0.2),
-                                              ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    // Row number with delete button - flex column
+                                    Expanded(
+                                      flex: ((_columnFlex['input_row'] ?? 0.5) * 100).round(),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${originalIndex + 1}',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                             ),
                                           ),
-                                          child: Row(
-                                            children: [
-                                              // Row number
-                                              SizedBox(
-                                                width: _columnWidths['input_row'] ?? 50,
-                                                child: Text(
-                                                  '${originalIndex + 1}',
-                                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                                  ),
-                                                ),
-                                              ),
-                                              // Dynamic CSV column values
-                                              if (_csvColumns.isNotEmpty)
-                                                ..._csvColumns.map((columnName) => SizedBox(
-                                                  width: _columnWidths['input_$columnName'] ?? 200,
-                                                  child: InkWell(
-                                                    onTap: () => _editTaskColumnValue(originalIndex, columnName),
-                                                    child: Padding(
-                                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                                                      child: Text(
-                                                        task.rowData[columnName] ?? '-',
-                                                        maxLines: 2,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ))
-                                              else
-                                                SizedBox(
-                                                  width: _columnWidths['input_flowInput'] ?? 300,
-                                                  child: InkWell(
-                                                    onTap: () => _editTaskInput(originalIndex),
-                                                    child: Padding(
-                                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                                                      child: Text(
-                                                        task.flowInput['input']?.toString() ?? '',
-                                                        maxLines: 2,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              SizedBox(
-                                                width: 48,
-                                                child: IconButton(
-                                                  icon: const Icon(Icons.delete_outline),
-                                                  onPressed: () {
-                                                    setState(() => _tasks.removeAt(originalIndex));
-                                                  },
-                                                ),
-                                              ),
-                                            ],
+                                          const SizedBox(width: 4),
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.delete_outline,
+                                              size: 16,
+                                              color: theme.colorScheme.error.withValues(alpha: 0.7),
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(
+                                              minWidth: 24,
+                                              minHeight: 24,
+                                            ),
+                                            tooltip: 'Delete task',
+                                            onPressed: () {
+                                              setState(() => _tasks.removeAt(originalIndex));
+                                            },
                                           ),
-                                        );
-                                      },
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                                    // Dynamic CSV column values - flex columns
+                                    if (_csvColumns.isNotEmpty)
+                                      ..._csvColumns.map((columnName) => Expanded(
+                                        flex: ((_columnFlex['input_$columnName'] ?? 1.5) * 100).round(),
+                                        child: InkWell(
+                                          onTap: () => _editTaskColumnValue(originalIndex, columnName),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                            child: Text(
+                                              task.rowData[columnName] ?? '-',
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ),
+                                      ))
+                                    else
+                                      Expanded(
+                                        flex: ((_columnFlex['input_flowInput'] ?? 3.0) * 100).round(),
+                                        child: InkWell(
+                                          onTap: () => _editTaskInput(originalIndex),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                            child: Text(
+                                              task.flowInput['input']?.toString() ?? '',
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],
-                    );
-                  },
-                ),
+                    ),
               ),
         ),
       ],
@@ -1584,35 +1565,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
             border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Builder(
-            builder: (context) {
-              // Calculate total content width based on column widths
-              double totalWidth = (_columnWidths['exec_row'] ?? 50) +
-                  (_columnWidths['exec_status'] ?? 70) +
-                  (_columnWidths['exec_time'] ?? 150) +
-                  (_columnWidths['exec_credits'] ?? 100) +
-                  (_columnWidths['exec_output'] ?? 80) +
-                  48 + 32; // delete button + padding
-              if (_csvColumns.isNotEmpty) {
-                for (final col in _csvColumns) {
-                  totalWidth += _columnWidths['exec_$col'] ?? 150;
-                }
-              } else {
-                totalWidth += _columnWidths['exec_input'] ?? 200;
-              }
-
-              return Scrollbar(
-                controller: _executeTableHorizontalScrollController,
-                thumbVisibility: true,
-                trackVisibility: true,
-                child: SingleChildScrollView(
-                  controller: _executeTableHorizontalScrollController,
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: totalWidth,
-                    child: Column(
+          child: Column(
                       children: [
-                        // Table header
+                        // Table header - uses full width with flex columns
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
@@ -1624,71 +1579,62 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                           ),
                           child: Row(
                             children: [
-                              _buildResizableColumnHeader(
+                              _buildFlexColumnHeader(
                                 columnKey: 'exec_row',
                                 label: '#',
                                 theme: theme,
-                                defaultWidth: 50,
+                                defaultFlex: 0.3,
                                 sortColumn: 'row',
                                 isInputDataTable: false,
                               ),
-                              _buildResizableColumnHeader(
+                              _buildFlexColumnHeader(
                                 columnKey: 'exec_status',
                                 label: 'Status',
                                 theme: theme,
-                                defaultWidth: 70,
+                                defaultFlex: 1.0,
                                 sortColumn: 'status',
                                 isInputDataTable: false,
                               ),
-                              _buildResizableColumnHeader(
+                              _buildFlexColumnHeader(
                                 columnKey: 'exec_output',
                                 label: 'Output',
                                 theme: theme,
-                                defaultWidth: 80,
+                                defaultFlex: 0.5,
                                 isInputDataTable: false,
                               ),
                               // Dynamic CSV column headers
                               if (_csvColumns.isNotEmpty)
-                                ..._csvColumns.asMap().entries.map((entry) => _buildResizableColumnHeader(
+                                ..._csvColumns.asMap().entries.map((entry) => _buildFlexColumnHeader(
                                   columnKey: 'exec_${entry.value}',
                                   label: entry.value,
                                   theme: theme,
-                                  defaultWidth: 150,
+                                  defaultFlex: 1.2,
                                   sortColumn: entry.value,
                                   isInputDataTable: false,
                                 ))
                               else
-                                _buildResizableColumnHeader(
+                                _buildFlexColumnHeader(
                                   columnKey: 'exec_input',
                                   label: 'Input Value',
                                   theme: theme,
-                                  defaultWidth: 200,
+                                  defaultFlex: 1.5,
                                   sortColumn: 'input',
                                   isInputDataTable: false,
                                 ),
-                              _buildResizableColumnHeader(
+                              _buildFlexColumnHeader(
                                 columnKey: 'exec_time',
                                 label: 'Time',
                                 theme: theme,
-                                defaultWidth: 150,
+                                defaultFlex: 1.0,
                                 isInputDataTable: false,
                               ),
-                              _buildResizableColumnHeader(
+                              _buildFlexColumnHeader(
                                 columnKey: 'exec_credits',
                                 label: 'Credits',
                                 theme: theme,
-                                defaultWidth: 100,
+                                defaultFlex: 0.6,
                                 sortColumn: 'credits',
                                 isInputDataTable: false,
-                              ),
-                              SizedBox(
-                                width: 48,
-                                child: Text(
-                                  '',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
                               ),
                             ],
                           ),
@@ -1716,8 +1662,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                     child: Row(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        SizedBox(
-                                          width: _columnWidths['exec_row'] ?? 50,
+                                        // Row number - flex column
+                                        Expanded(
+                                          flex: ((_columnFlex['exec_row'] ?? 0.3) * 100).round(),
                                           child: Text(
                                             '${originalIndex + 1}',
                                             style: theme.textTheme.bodyMedium?.copyWith(
@@ -1725,8 +1672,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                             ),
                                           ),
                                         ),
-                                        SizedBox(
-                                          width: _columnWidths['exec_status'] ?? 70,
+                                        // Status column - flex column
+                                        Expanded(
+                                          flex: ((_columnFlex['exec_status'] ?? 1.0) * 100).round(),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
@@ -1768,11 +1716,33 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                                   onPressed: () => _retryTask(task),
                                                 ),
                                               ],
+                                              // Delete button
+                                              IconButton(
+                                                icon: Icon(
+                                                  Icons.delete_outline,
+                                                  size: 16,
+                                                  color: task.status == 'queued'
+                                                      ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                                                      : theme.colorScheme.error.withValues(alpha: 0.7),
+                                                ),
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(
+                                                  minWidth: 20,
+                                                  minHeight: 20,
+                                                ),
+                                                tooltip: task.status == 'queued' ? 'Cannot delete running task' : 'Delete task',
+                                                onPressed: task.status == 'queued'
+                                                    ? null
+                                                    : () {
+                                                        setState(() => _tasks.removeAt(originalIndex));
+                                                      },
+                                              ),
                                             ],
                                           ),
                                         ),
-                                        SizedBox(
-                                          width: _columnWidths['exec_output'] ?? 80,
+                                        // Output column - flex column
+                                        Expanded(
+                                          flex: ((_columnFlex['exec_output'] ?? 0.5) * 100).round(),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
@@ -1813,10 +1783,10 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                             ],
                                           ),
                                         ),
-                                        // Dynamic CSV column values
+                                        // Dynamic CSV column values - flex columns
                                         if (_csvColumns.isNotEmpty)
-                                          ..._csvColumns.map((columnName) => SizedBox(
-                                            width: _columnWidths['exec_$columnName'] ?? 150,
+                                          ..._csvColumns.map((columnName) => Expanded(
+                                            flex: ((_columnFlex['exec_$columnName'] ?? 1.2) * 100).round(),
                                             child: InkWell(
                                               onTap: () => _editTaskColumnValue(originalIndex, columnName),
                                               child: Padding(
@@ -1831,8 +1801,8 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                             ),
                                           ))
                                         else
-                                          SizedBox(
-                                            width: _columnWidths['exec_input'] ?? 200,
+                                          Expanded(
+                                            flex: ((_columnFlex['exec_input'] ?? 1.5) * 100).round(),
                                             child: InkWell(
                                               onTap: () => _editTaskInput(originalIndex),
                                               child: Padding(
@@ -1846,8 +1816,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                               ),
                                             ),
                                           ),
-                                        SizedBox(
-                                          width: _columnWidths['exec_time'] ?? 150,
+                                        // Time column - flex column
+                                        Expanded(
+                                          flex: ((_columnFlex['exec_time'] ?? 1.0) * 100).round(),
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
@@ -1870,37 +1841,14 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                                             ],
                                           ),
                                         ),
-                                        SizedBox(
-                                          width: _columnWidths['exec_credits'] ?? 100,
+                                        // Credits column - flex column
+                                        Expanded(
+                                          flex: ((_columnFlex['exec_credits'] ?? 0.6) * 100).round(),
                                           child: Text(
                                             task.credits != null
                                               ? task.credits!.toStringAsFixed(6)
                                               : '-',
                                             style: theme.textTheme.bodySmall,
-                                          ),
-                                        ),
-                                        // Delete button
-                                        SizedBox(
-                                          width: 48,
-                                          child: IconButton(
-                                            icon: Icon(
-                                              Icons.delete_outline,
-                                              size: 18,
-                                              color: task.status == 'queued'
-                                                  ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                                                  : theme.colorScheme.error.withValues(alpha: 0.7),
-                                            ),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(
-                                              minWidth: 32,
-                                              minHeight: 32,
-                                            ),
-                                            tooltip: task.status == 'queued' ? 'Cannot delete running task' : 'Delete task',
-                                            onPressed: task.status == 'queued'
-                                                ? null
-                                                : () {
-                                                    setState(() => _tasks.removeAt(originalIndex));
-                                                  },
                                           ),
                                         ),
                                       ],
@@ -1913,11 +1861,6 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
                         ),
                       ],
                     ),
-                  ),
-                ),
-              );
-            },
-          ),
         ),
       ],
     );
@@ -2189,22 +2132,22 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     return tasks;
   }
 
-  // Resizable column header with sorting support
-  Widget _buildResizableColumnHeader({
+  // Resizable column header with sorting support - uses flex for proportional sizing
+  Widget _buildFlexColumnHeader({
     required String columnKey,
     required String label,
     required ThemeData theme,
-    required double defaultWidth,
+    required double defaultFlex,
     String? sortColumn,
     bool isInputDataTable = false,
   }) {
-    final currentWidth = _columnWidths[columnKey] ?? defaultWidth;
+    final currentFlex = _columnFlex[columnKey] ?? defaultFlex;
     final isActive = sortColumn != null &&
         (isInputDataTable ? _inputDataSortColumn == sortColumn : _sortColumn == sortColumn);
     final sortAscending = isInputDataTable ? _inputDataSortAscending : _sortAscending;
 
-    return SizedBox(
-      width: currentWidth,
+    return Expanded(
+      flex: (currentFlex * 100).round(),
       child: Row(
         children: [
           Expanded(
@@ -2253,14 +2196,16 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
               ),
             ),
           ),
-          // Resize handle
+          // Resize handle - adjusts flex ratio
           MouseRegion(
             cursor: SystemMouseCursors.resizeColumn,
             child: GestureDetector(
               onHorizontalDragUpdate: (details) {
                 setState(() {
-                  final newWidth = (currentWidth + details.delta.dx).clamp(50.0, 500.0);
-                  _columnWidths[columnKey] = newWidth;
+                  // Adjust flex by a small amount based on drag direction
+                  final delta = details.delta.dx / 100;
+                  final newFlex = (currentFlex + delta).clamp(0.3, 5.0);
+                  _columnFlex[columnKey] = newFlex;
                 });
               },
               child: Container(

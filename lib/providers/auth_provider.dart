@@ -83,18 +83,21 @@ final authStateProvider = FutureProvider<bool>((ref) async {
 });
 
 // Auth Error Notifier - to trigger navigation to login on auth failures
-class AuthErrorNotifier extends StateNotifier<bool> {
-  AuthErrorNotifier() : super(false);
+class AuthErrorNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return false;
+  }
 
   void triggerAuthError() {
     state = true;
     // Reset after triggering
     Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) state = false;
+      state = false;
     });
   }
 }
 
-final authErrorProvider = StateNotifierProvider<AuthErrorNotifier, bool>((ref) {
+final authErrorProvider = NotifierProvider<AuthErrorNotifier, bool>(() {
   return AuthErrorNotifier();
 });

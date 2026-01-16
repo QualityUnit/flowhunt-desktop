@@ -34,14 +34,9 @@ class AddonState {
   }
 }
 
-class AddonNotifier extends StateNotifier<AddonState> {
-  final Ref ref;
-
-  AddonNotifier(this.ref) : super(AddonState()) {
-    _initialize();
-  }
-
-  void _initialize() {
+class AddonNotifier extends Notifier<AddonState> {
+  @override
+  AddonState build() {
     // Create the default addon
     final defaultAddon = Addon(
       id: 'default',
@@ -51,17 +46,17 @@ class AddonNotifier extends StateNotifier<AddonState> {
       isActive: true,
     );
 
-    state = state.copyWith(
-      availableAddons: [defaultAddon],
-      activeAddon: defaultAddon,
-    );
-
     // Listen to workspace changes
     ref.listen(workspaceProvider, (previous, next) {
       if (next.currentWorkspace != null) {
         _loadWorkspaceAddons(next.currentWorkspace!.workspaceId);
       }
     });
+
+    return AddonState(
+      availableAddons: [defaultAddon],
+      activeAddon: defaultAddon,
+    );
   }
 
   Future<void> loadAddons() async {
@@ -159,6 +154,6 @@ class AddonNotifier extends StateNotifier<AddonState> {
   }
 }
 
-final addonProvider = StateNotifierProvider<AddonNotifier, AddonState>((ref) {
-  return AddonNotifier(ref);
+final addonProvider = NotifierProvider<AddonNotifier, AddonState>(() {
+  return AddonNotifier();
 });

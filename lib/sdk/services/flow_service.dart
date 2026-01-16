@@ -346,7 +346,7 @@ class FlowService {
       final SessionInvocationResponse invocationResponse;
       if (response is List) {
         // API returns array of messages directly
-        final messages = (response as List).map((item) =>
+        final messages = response.map((item) =>
           SessionMessage.fromJson(item as Map<String, dynamic>)
         ).toList();
 

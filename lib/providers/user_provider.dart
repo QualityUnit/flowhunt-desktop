@@ -36,10 +36,14 @@ class UserState {
 }
 
 // State notifier for managing user data
-class UserNotifier extends StateNotifier<UserState> {
-  final UserService _userService;
+class UserNotifier extends Notifier<UserState> {
+  late final UserService _userService;
 
-  UserNotifier(this._userService) : super(UserState());
+  @override
+  UserState build() {
+    _userService = ref.watch(userServiceProvider);
+    return UserState();
+  }
 
   Future<void> fetchUser() async {
     state = state.copyWith(isLoading: true, error: null);
@@ -81,9 +85,8 @@ class UserNotifier extends StateNotifier<UserState> {
 }
 
 // Provider for user state
-final userProvider = StateNotifierProvider<UserNotifier, UserState>((ref) {
-  final userService = ref.watch(userServiceProvider);
-  return UserNotifier(userService);
+final userProvider = NotifierProvider<UserNotifier, UserState>(() {
+  return UserNotifier();
 });
 
 // Provider for API client with auth

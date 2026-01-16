@@ -310,35 +310,35 @@ class ApiException implements Exception {
 }
 
 class UnauthorizedException extends ApiException {
-  UnauthorizedException(String message) : super(message, statusCode: 401);
+  UnauthorizedException(super.message) : super(statusCode: 401);
 }
 
 class ForbiddenException extends ApiException {
-  ForbiddenException(String message) : super(message, statusCode: 403);
+  ForbiddenException(super.message) : super(statusCode: 403);
 }
 
 class NotFoundException extends ApiException {
-  NotFoundException(String message) : super(message, statusCode: 404);
+  NotFoundException(super.message) : super(statusCode: 404);
 }
 
 class ValidationException extends ApiException {
   final dynamic errors;
 
-  ValidationException(String message, this.errors) : super(message, statusCode: 422);
+  ValidationException(super.message, this.errors) : super(statusCode: 422);
 }
 
 class RateLimitException extends ApiException {
-  RateLimitException(String message) : super(message, statusCode: 429);
+  RateLimitException(super.message) : super(statusCode: 429);
 }
 
 class ServerException extends ApiException {
-  ServerException(String message) : super(message, statusCode: 500);
+  ServerException(super.message) : super(statusCode: 500);
 }
 
 class NetworkException extends ApiException {
-  NetworkException(String message) : super(message);
+  NetworkException(super.message);
 }
 
 class TimeoutException extends ApiException {
-  TimeoutException(String message) : super(message);
+  TimeoutException(super.message);
 }

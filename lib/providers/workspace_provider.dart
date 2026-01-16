@@ -40,11 +40,15 @@ class WorkspaceState {
 }
 
 // State notifier for managing workspace data
-class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
-  final WorkspaceService _workspaceService;
+class WorkspaceNotifier extends Notifier<WorkspaceState> {
+  late final WorkspaceService _workspaceService;
   static const String _currentWorkspaceKey = 'current_workspace_id';
 
-  WorkspaceNotifier(this._workspaceService) : super(WorkspaceState());
+  @override
+  WorkspaceState build() {
+    _workspaceService = ref.watch(workspaceServiceProvider);
+    return WorkspaceState();
+  }
 
   Future<void> fetchWorkspaces() async {
     state = state.copyWith(isLoading: true, error: null);
@@ -196,7 +200,6 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
 }
 
 // Provider for workspace state
-final workspaceProvider = StateNotifierProvider<WorkspaceNotifier, WorkspaceState>((ref) {
-  final workspaceService = ref.watch(workspaceServiceProvider);
-  return WorkspaceNotifier(workspaceService);
+final workspaceProvider = NotifierProvider<WorkspaceNotifier, WorkspaceState>(() {
+  return WorkspaceNotifier();
 });
