@@ -25,6 +25,7 @@ BUNDLE_ID="com.flowhunt.desktop"
 VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | tr -d ' ')
 BUILD_DIR="build"
 DIST_DIR="dist"
+CREATE_RELEASE=false
 
 # Print colored output
 print_info() {
@@ -144,6 +145,11 @@ build_macos() {
 
     print_success "macOS DMG created: $DMG_PATH ($DMG_SIZE)"
     print_info "Location: $(pwd)/$DMG_PATH"
+
+    # Create GitHub release if requested
+    if [ "$CREATE_RELEASE" = true ]; then
+        create_github_release "macOS" "$DMG_PATH"
+    fi
 }
 
 # Build for Windows
@@ -187,6 +193,11 @@ build_windows() {
     print_warning "  2. Code signing certificate"
     print_warning "  3. Run 'flutter build windows --release' on Windows"
     print_warning "  4. Use Windows Packaging Tools to create MSIX"
+
+    # Create GitHub release if requested
+    if [ "$CREATE_RELEASE" = true ]; then
+        create_github_release "Windows" "$ZIP_PATH"
+    fi
 }
 
 # Build for Linux
@@ -228,6 +239,101 @@ build_linux() {
     print_warning "Note: For AppImage or DEB packages, you'll need:"
     print_warning "  - AppImage: Use appimagetool"
     print_warning "  - DEB: Create debian control files and use dpkg-deb"
+
+    # Create GitHub release if requested
+    if [ "$CREATE_RELEASE" = true ]; then
+        create_github_release "Linux" "$TAR_PATH"
+    fi
+}
+
+# Create GitHub Release
+create_github_release() {
+    local platform=$1
+    local file_path=$2
+
+    print_header "Creating GitHub Release"
+
+    # Check if gh CLI is installed
+    if ! command -v gh &> /dev/null; then
+        print_error "GitHub CLI (gh) is not installed"
+        print_info "Install it with: brew install gh"
+        print_info "Then authenticate with: gh auth login"
+        return 1
+    fi
+
+    # Check if authenticated
+    if ! gh auth status &> /dev/null; then
+        print_error "Not authenticated with GitHub"
+        print_info "Run: gh auth login"
+        return 1
+    fi
+
+    local tag="v$VERSION"
+
+    # Check if we have uncommitted changes
+    if ! git diff-index --quiet HEAD --; then
+        print_warning "You have uncommitted changes"
+        read -p "Do you want to commit them first? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Committing changes..."
+            git add .
+            git commit -m "v$VERSION: Build release"
+        else
+            print_warning "Proceeding with uncommitted changes..."
+        fi
+    fi
+
+    # Check if tag already exists
+    if git rev-parse "$tag" >/dev/null 2>&1; then
+        print_info "Tag $tag already exists"
+        read -p "Do you want to delete and recreate it? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Deleting old tag..."
+            git tag -d "$tag"
+            git push origin ":$tag" 2>/dev/null || true
+        else
+            print_info "Using existing tag"
+        fi
+    fi
+
+    # Create tag if it doesn't exist
+    if ! git rev-parse "$tag" >/dev/null 2>&1; then
+        print_info "Creating git tag: $tag"
+        git tag -a "$tag" -m "Release $tag"
+
+        print_info "Pushing tag to GitHub..."
+        git push origin "$tag"
+    fi
+
+    # Check if release already exists
+    if gh release view "$tag" &> /dev/null; then
+        print_info "Release $tag already exists"
+        print_info "Uploading $platform build to existing release..."
+        gh release upload "$tag" "$file_path" --clobber
+    else
+        print_info "Creating new release: $tag"
+
+        # Generate release notes
+        local notes="## What's New in v$VERSION
+
+### Platform: $platform
+
+Download the appropriate file for your platform below.
+
+---
+*Built with FlowHunt Desktop build script*"
+
+        # Create release and upload file
+        gh release create "$tag" \
+            --title "v$VERSION" \
+            --notes "$notes" \
+            "$file_path"
+    fi
+
+    print_success "GitHub release created/updated!"
+    print_info "View it at: $(gh release view $tag --json url -q .url)"
 }
 
 # Show usage
@@ -235,11 +341,14 @@ show_usage() {
     echo "FlowHunt Desktop Build Script"
     echo ""
     echo "Usage:"
-    echo "  ./build.sh macos          Build macOS DMG"
-    echo "  ./build.sh windows        Build Windows installer"
-    echo "  ./build.sh linux          Build Linux packages"
-    echo "  ./build.sh all            Build for all platforms"
-    echo "  ./build.sh clean          Clean build artifacts"
+    echo "  ./build.sh macos [--release]     Build macOS DMG"
+    echo "  ./build.sh windows [--release]   Build Windows installer"
+    echo "  ./build.sh linux [--release]     Build Linux packages"
+    echo "  ./build.sh all [--release]       Build for all platforms"
+    echo "  ./build.sh clean                 Clean build artifacts"
+    echo ""
+    echo "Options:"
+    echo "  --release    Automatically create GitHub release and upload build"
     echo ""
     echo "Current version: $VERSION"
 }
@@ -251,9 +360,27 @@ main() {
         exit 0
     fi
 
+    # Parse arguments
+    local command=$1
+    shift
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --release)
+                CREATE_RELEASE=true
+                shift
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+        esac
+    done
+
     check_flutter
 
-    case "$1" in
+    case "$command" in
         macos)
             build_macos
             ;;
@@ -286,7 +413,7 @@ main() {
             clean_build
             ;;
         *)
-            print_error "Unknown command: $1"
+            print_error "Unknown command: $command"
             show_usage
             exit 1
             ;;
