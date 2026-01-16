@@ -106,41 +106,152 @@ For detailed instructions including:
 
 See **[BUILD-GUIDE.md](BUILD-GUIDE.md)** for the complete documentation.
 
-## Releasing
+## Deployment & Releases
 
-Releases are created automatically via GitHub Actions when you push a tag.
+FlowHunt Desktop supports automated deployment through GitHub Actions and a convenient build script.
 
-### Release a specific platform
+### Quick Deploy (Recommended)
 
-```bash
-# Windows release
-git tag windows-1.0.0
-git push origin windows-1.0.0
-
-# Linux release
-git tag linux-1.0.0
-git push origin linux-1.0.0
-
-# macOS release (run locally on Mac)
-./release-macos.sh 1.0.0
-```
-
-### Tag format
-
-| Platform | Tag pattern | Example | Output |
-|----------|-------------|---------|--------|
-| Windows | `windows-*` | `windows-1.0.0` | `FlowHunt-Desktop-Windows-1.0.0.zip` |
-| Linux | `linux-*` | `linux-1.0.0` | `FlowHunt-Desktop-Linux-1.0.0.tar.gz` |
-| macOS | `macos-*` | `macos-1.0.0` | `FlowHunt-Desktop-1.0.0-macOS.dmg` |
-
-### Full release (all platforms)
+The easiest way to create a new release:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+# 1. Update version in pubspec.yaml
+# Change: version: 1.0.2+2
+# To:     version: 1.0.3+3
+
+# 2. Build and release in one command
+./build.sh macos --release
 ```
 
-This triggers the main build workflow that builds all platforms and creates a single release.
+This automatically:
+- ✅ Builds the macOS release app
+- ✅ Creates a DMG installer
+- ✅ Commits version changes
+- ✅ Creates and pushes git tag
+- ✅ Creates GitHub release
+- ✅ Uploads DMG to release
+- ✅ Triggers CI/CD for Windows/Linux builds
+
+### Prerequisites for Deployment
+
+**One-time setup:**
+
+```bash
+# Install GitHub CLI
+brew install gh
+
+# Authenticate with GitHub
+gh auth login
+```
+
+### Build Commands
+
+```bash
+# Build with automatic GitHub release
+./build.sh macos --release      # Build macOS and release
+./build.sh windows --release    # Build Windows and release
+./build.sh linux --release      # Build Linux and release
+./build.sh all --release        # Build all platforms and release
+
+# Build without releasing (local testing)
+./build.sh macos               # Just create DMG
+./build.sh windows             # Just create ZIP
+./build.sh linux               # Just create TAR.GZ
+```
+
+### Manual Deployment
+
+If you prefer to deploy manually:
+
+```bash
+# 1. Update version in pubspec.yaml
+# version: 1.0.3+3
+
+# 2. Commit changes
+git add .
+git commit -m "v1.0.3: Description of changes"
+git push origin main
+
+# 3. Create and push tag
+git tag -a v1.0.3 -m "Release v1.0.3"
+git push origin v1.0.3
+
+# 4. Create release with GitHub CLI
+gh release create v1.0.3 \
+  --title "v1.0.3 - Release Title" \
+  --notes "Release notes here" \
+  dist/*.dmg
+```
+
+### Automated CI/CD
+
+When you push a version tag (e.g., `v1.0.3`), GitHub Actions automatically:
+1. Builds for macOS, Windows, and Linux
+2. Creates DMG, ZIP, and TAR.GZ installers
+3. Creates a GitHub release
+4. Uploads all platform builds to the release
+
+**Workflow file:** `.github/workflows/build.yml`
+
+### Version Management
+
+Version format: `MAJOR.MINOR.PATCH+BUILD`
+
+Example: `1.0.3+3`
+- `1.0.3` - Semantic version (major.minor.patch)
+- `+3` - Build number (increments with each build)
+
+**When to increment:**
+- **Major** (1.x.x) - Breaking changes
+- **Minor** (x.1.x) - New features (backward compatible)
+- **Patch** (x.x.1) - Bug fixes
+- **Build** (+x) - Every release
+
+### Release Checklist
+
+Before releasing:
+
+- [ ] Update version in `pubspec.yaml`
+- [ ] Test the build locally: `flutter build macos --release`
+- [ ] Run tests: `flutter test`
+- [ ] Check for warnings: `flutter analyze`
+- [ ] Update CHANGELOG.md (if exists)
+- [ ] Commit all changes
+- [ ] Run `./build.sh macos --release`
+- [ ] Verify release on GitHub
+- [ ] Test download and installation
+
+### Troubleshooting Deployment
+
+**Build fails:**
+```bash
+# Clean and rebuild
+flutter clean
+flutter pub get
+./build.sh macos
+```
+
+**GitHub CLI not authenticated:**
+```bash
+gh auth login
+gh auth status
+```
+
+**Tag already exists:**
+```bash
+# Delete local and remote tag
+git tag -d v1.0.3
+git push origin :v1.0.3
+
+# Create new tag
+git tag -a v1.0.3 -m "Release v1.0.3"
+git push origin v1.0.3
+```
+
+**Release not appearing:**
+- Check GitHub Actions status in the "Actions" tab
+- Ensure the tag follows the `v*` pattern
+- Verify you have push permissions to the repository
 
 ## Configuration
 
