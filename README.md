@@ -185,13 +185,81 @@ gh release create v1.0.3 \
 
 ### Automated CI/CD
 
-When you push a version tag (e.g., `v1.0.3`), GitHub Actions automatically:
-1. Builds for macOS, Windows, and Linux
-2. Creates DMG, ZIP, and TAR.GZ installers
+GitHub Actions supports multiple tag patterns for different deployment scenarios:
+
+#### Full Release (All Platforms)
+
+```bash
+git tag v1.0.3
+git push origin v1.0.3
+```
+
+Builds: macOS + Windows + Linux
+
+#### Platform-Specific Releases
+
+```bash
+# macOS only
+git tag macos-1.0.3
+git push origin macos-1.0.3
+
+# Windows only
+git tag windows-1.0.3
+git push origin windows-1.0.3
+
+# Linux only
+git tag linux-1.0.3
+git push origin linux-1.0.3
+```
+
+**Tag Patterns:**
+
+| Tag Pattern | Builds | Example | Output |
+|-------------|--------|---------|--------|
+| `v*` | All platforms | `v1.0.3` | macOS DMG + Windows ZIP + Linux TAR.GZ |
+| `macos-*` | macOS only | `macos-1.0.3` | macOS DMG |
+| `windows-*` | Windows only | `windows-1.0.3` | Windows ZIP |
+| `linux-*` | Linux only | `linux-1.0.3` | Linux TAR.GZ |
+
+When you push any of these tags, GitHub Actions automatically:
+1. Builds for the specified platform(s)
+2. Creates installer packages
 3. Creates a GitHub release
-4. Uploads all platform builds to the release
+4. Uploads build artifacts to the release
 
 **Workflow file:** `.github/workflows/build.yml`
+
+#### Common CI/CD Scenarios
+
+**Scenario 1: Quick macOS hotfix**
+```bash
+# Fix bug, update version to 1.0.3, then:
+git add .
+git commit -m "fix: Critical bug on macOS"
+git push origin main
+git tag macos-1.0.3
+git push origin macos-1.0.3
+# Only macOS builds, saves CI time
+```
+
+**Scenario 2: Full production release**
+```bash
+# Update version, test everything, then:
+git add .
+git commit -m "v1.1.0: New features"
+git push origin main
+git tag v1.1.0
+git push origin v1.1.0
+# All platforms build automatically
+```
+
+**Scenario 3: Test Windows-specific changes**
+```bash
+# After Windows-specific fixes:
+git tag windows-1.0.3-beta
+git push origin windows-1.0.3-beta
+# Only Windows builds for testing
+```
 
 ### Version Management
 
